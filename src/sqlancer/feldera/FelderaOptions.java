@@ -17,7 +17,7 @@ public class FelderaOptions implements DBMSSpecificOptions<FelderaOracleFactory>
     public List<FelderaOracleFactory> oracle = List.of(FelderaOracleFactory.NOREC);
 
     @Parameter(names = "--connection-url", description = "Specifies the URL for connecting to the Feldera", arity = 1)
-    public String connectionURL = DEFAULT_URL;
+    public String connection_url = DEFAULT_URL;
 
     @Override
     public List<FelderaOracleFactory> getTestOracleFactory() {

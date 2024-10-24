@@ -5,23 +5,20 @@ import sqlancer.*;
 import com.google.auto.service.AutoService;
 import sqlancer.common.log.LoggableFactory;
 
-// import sqlancer.feldera.FelderaGlobalState;
+import sqlancer.feldera.client.FelderaClient;
 import sqlancer.feldera.gen.FelderaInsertGenerator;
+import sqlancer.feldera.gen.FelderaTableGenerator;
 import sqlancer.feldera.query.FelderaOtherQuery;
 import sqlancer.feldera.query.FelderaQueryProvider;
 
-// import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Objects;
 
-@SuppressWarnings("unused")
 @AutoService(DatabaseProvider.class)
 public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, FelderaOptions, FelderaConnection> {
 
-    protected String username;
-    protected String password;
-    protected String host;
-    protected int port;
-    protected String databaseName;
+    protected String url;
+    protected String pipelineName;
 
     public FelderaProvider() {
         super(FelderaGlobalState.class, FelderaOptions.class);
@@ -55,29 +52,31 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     }
 
     @Override
-    public FelderaConnection createDatabase(@SuppressWarnings("unused") FelderaGlobalState globalState) throws Exception {
+    public FelderaConnection createDatabase(FelderaGlobalState globalState) throws Exception {
 
-//        username = globalState.getOptions().getUserName();
-//        password = globalState.getOptions().getPassword();
-//        host = globalState.getOptions().getHost();
-//        port = globalState.getOptions().getPort();
-//        databaseName = globalState.getDatabaseName();
-//        FelderaClient client = new FelderaClient(host, port, username, password, databaseName);
-//        FelderaConnection connection = new FelderaConnection(client);
-//        client.execute("DROP DATABASE IF EXISTS " + databaseName);
-//        globalState.getState().logStatement("DROP DATABASE IF EXISTS " + databaseName);
-//        client.execute("CREATE DATABASE " + databaseName);
-//        globalState.getState().logStatement("CREATE DATABASE " + databaseName);
+        url = globalState.getDbmsSpecificOptions().connection_url;
+        pipelineName = globalState.getDatabaseName();
+        FelderaClient client = new FelderaClient(url, pipelineName);
 
-//        return connection;
-        return null;
+        try (FelderaConnection connection = new FelderaConnection(client)) {
+            HashMap<String, Object> map = client.get();
+            if (map != null) {
+                globalState.getState().logStatement("pipeline " + pipelineName + " exists, shutting down");
+                client.shutdown();
+            }
+
+            return connection;
+        }
     }
 
     protected void createTables(FelderaGlobalState globalState, int numTables) throws Exception {
-        while (globalState.getSchema().getDatabaseTables().size() < numTables) {
-            String tableName = String.format("m%d", globalState.getSchema().getDatabaseTables().size());
-//            FelderaOtherQuery createTable = FelderaTableGenerator.generate(tableName);
-//            globalState.executeStatement(createTable);
+        for (int i = 0; i < numTables; i++) {
+            String tableName = String.format("t%d", i);
+            FelderaTableGenerator generator = new FelderaTableGenerator(tableName);
+            FelderaOtherQuery createTable = generator.generate();
+            FelderaSchema.FelderaTable table = generator.getTable();
+            globalState.addTable(table);
+            globalState.executeStatement(createTable);
         }
     }
 
@@ -98,8 +97,7 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
 
     @Override
     public LoggableFactory getLoggableFactory() {
-//        return new FelderaLoggableFactory();
-        return null;
+        return new FelderaLoggableFactory();
     }
 
     public enum Action implements AbstractAction<FelderaGlobalState> {
@@ -113,9 +111,8 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
 
         @Override
         public FelderaOtherQuery getQuery(FelderaGlobalState state) throws Exception {
-//            return new FelderaOtherQuery(sqlQueryProvider.getQuery(state).getQueryString(),
-//                    FelderaExpectedError.expectedErrors());
-            return null;
+            return new FelderaOtherQuery(sqlQueryProvider.getQuery(state).getQueryString(),
+                    FelderaExpectedError.expectedErrors());
         }
     }
 

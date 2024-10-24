@@ -6,6 +6,9 @@ import sqlancer.feldera.FelderaSchema;
 import sqlancer.feldera.query.FelderaOtherQuery;
 
 public class FelderaInsertGenerator extends AbstractInsertGenerator<FelderaSchema.FelderaColumn> {
+
+    private FelderaInsertGenerator() {}
+
     @Override
     protected void insertValue(FelderaSchema.FelderaColumn column) {
 

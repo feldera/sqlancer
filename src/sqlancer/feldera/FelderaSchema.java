@@ -15,11 +15,37 @@ import sqlancer.feldera.ast.FelderaConstant;
 
 public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSchema.FelderaTable> {
 
-    private final String databaseName;
+    private final String pipelineName;
 
-    public FelderaSchema(List<FelderaTable> databaseTables, String databaseName) {
+    public FelderaSchema(List<FelderaTable> databaseTables, String pipelineName) {
         super(databaseTables);
-        this.databaseName = databaseName;
+        this.pipelineName = pipelineName;
+    }
+
+    public FelderaSchema(String pipelineName) {
+        super(new ArrayList<>());
+        this.pipelineName = pipelineName;
+    }
+
+    public FelderaSchema addTable(FelderaTable table) {
+        List<FelderaTable> tables = new ArrayList<>(this.getDatabaseTables());
+        tables.add(table);
+
+        return new FelderaSchema(tables, this.pipelineName);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder dbg = new StringBuilder("FelderaSchema{" +
+                "pipelineName='" + pipelineName + '\n');
+
+        for (FelderaTable tbl: this.getDatabaseTablesWithoutViews()) {
+            dbg.append(tbl.toString());
+        }
+
+        dbg.append('}');
+
+        return dbg.toString();
     }
 
     public static FelderaDataType getColumnType(String typeString) {
@@ -38,19 +64,19 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     }
 
     public static FelderaSchema fromConnection(FelderaConnection con) throws Exception {
-        return null;
+        return new FelderaSchema(new ArrayList<>(), con.getClient().pipelineName());
     }
 
-    protected static List<FelderaColumn> getTableColumns(FelderaConnection con, String tableName) throws Exception {
-        return null;
+    protected List<FelderaColumn> getTableColumns(String tableName) throws Exception {
+        return this.getDatabaseTable(tableName).getColumns();
     }
 
     public FelderaTables getRandomTableNonEmptyTables() {
         return new FelderaTables(Randomly.nonEmptySubset(getDatabaseTables()));
     }
 
-    public String getDatabaseName() {
-        return databaseName;
+    public String getPipelineName() {
+        return pipelineName;
     }
 
     public enum FelderaDataType {
@@ -58,6 +84,13 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
 
         public static FelderaDataType getRandomType() {
             return Randomly.fromOptions(values());
+        }
+    }
+
+    public static class FelderaFieldColumn extends FelderaColumn {
+        public FelderaFieldColumn(String name, FelderaDataType columnType) {
+            super(name, columnType);
+            // later, you can assert that the Field column isn't something like INTERVAL
         }
     }
 

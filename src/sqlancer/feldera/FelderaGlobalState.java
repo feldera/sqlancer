@@ -20,7 +20,25 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
     }
 
     @Override
+    public void updateSchema() throws Exception {
+        ; // do nothing
+    }
+
+    @Override
+    public FelderaSchema getSchema() {
+        return super.getSchema();
+    }
+
+    @Override
     protected FelderaSchema readSchema() throws Exception {
-        return FelderaSchema.fromConnection(getConnection());
+       return FelderaSchema.fromConnection(getConnection());
+    }
+
+    public void addTable(FelderaSchema.FelderaTable table) {
+        FelderaSchema sch = getSchema();
+        if (sch == null) {
+            sch = new FelderaSchema(getConnection().getClient().pipelineName());
+        }
+      setSchema(sch.addTable(table));
     }
 }

@@ -1,19 +1,27 @@
 package sqlancer.feldera.query;
 
-import sqlancer.GlobalState;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.common.query.Query;
 import sqlancer.feldera.FelderaConnection;
 
-public class FelderaQueryAdapter extends Query<FelderaConnection> {
+public abstract class FelderaQueryAdapter extends Query<FelderaConnection> {
+
+    String query;
+    ExpectedErrors errors;
+
+    public FelderaQueryAdapter(String query, ExpectedErrors errors) {
+        this.query = query;
+        this.errors = errors;
+    }
+
     @Override
     public String getLogString() {
-        return null;
+        return query;
     }
 
     @Override
     public String getQueryString() {
-        return null;
+        return query;
     }
 
     @Override
@@ -27,12 +35,7 @@ public class FelderaQueryAdapter extends Query<FelderaConnection> {
     }
 
     @Override
-    public <G extends GlobalState<?, ?, FelderaConnection>> boolean execute(G globalState, String... fills) throws Exception {
-        return false;
-    }
-
-    @Override
     public ExpectedErrors getExpectedErrors() {
-        return null;
+        return errors;
     }
 }
