@@ -48,12 +48,10 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     public void generateDatabase(FelderaGlobalState globalState) throws Exception {
         createTables(globalState, Randomly.fromOptions(4, 5, 6));
         prepareTables(globalState);
-
     }
 
     @Override
     public FelderaConnection createDatabase(FelderaGlobalState globalState) throws Exception {
-
         url = globalState.getDbmsSpecificOptions().connection_url;
         pipelineName = globalState.getDatabaseName();
         FelderaClient client = new FelderaClient(url, pipelineName);

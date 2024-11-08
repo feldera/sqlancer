@@ -7,15 +7,9 @@ import java.util.Objects;
 
 public class FelderaConnection implements SQLancerDBConnection {
     private final FelderaClient client;
-    private FelderaSchema schema;
 
     public FelderaConnection(FelderaClient client) {
-        this.schema = new FelderaSchema(client.pipelineName());
         this.client = client;
-    }
-
-    public FelderaSchema getSchema() {
-        return schema;
     }
 
     public FelderaClient getClient()  {

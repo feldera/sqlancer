@@ -11,7 +11,7 @@ import sqlancer.DBMSSpecificOptions;
         +  FelderaOptions.DEFAULT_URL + ")")
 public class FelderaOptions implements DBMSSpecificOptions<FelderaOracleFactory> {
 
-    public static final String DEFAULT_URL = "http://localhost:8080";
+    public static final String DEFAULT_URL = "http://127.0.0.1:8080";
 
     @Parameter(names = "--oracle", description = "Specifies which test oracle should be used for Feldera")
     public List<FelderaOracleFactory> oracle = List.of(FelderaOracleFactory.NOREC);

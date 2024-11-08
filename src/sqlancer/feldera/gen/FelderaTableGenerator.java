@@ -34,7 +34,7 @@ public class FelderaTableGenerator {
             createField(name);
         }
 
-        sb.append(");");
+        sb.append(") with ('materialized' = 'true');\n");
         return new FelderaOtherQuery(sb.toString(), new ExpectedErrors());
     }
 

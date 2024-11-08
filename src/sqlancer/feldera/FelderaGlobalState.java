@@ -39,6 +39,6 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
         if (sch == null) {
             sch = new FelderaSchema(getConnection().getClient().pipelineName());
         }
-      setSchema(sch.addTable(table));
+        setSchema(sch.addTable(table));
     }
 }
