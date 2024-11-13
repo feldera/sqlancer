@@ -8,6 +8,7 @@ import sqlancer.common.log.LoggableFactory;
 import sqlancer.feldera.client.FelderaClient;
 import sqlancer.feldera.gen.FelderaInsertGenerator;
 import sqlancer.feldera.gen.FelderaTableGenerator;
+import sqlancer.feldera.gen.FelderaViewGenerator;
 import sqlancer.feldera.query.FelderaOtherQuery;
 import sqlancer.feldera.query.FelderaQueryProvider;
 
@@ -47,6 +48,7 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     @Override
     public void generateDatabase(FelderaGlobalState globalState) throws Exception {
         createTables(globalState, Randomly.fromOptions(4, 5, 6));
+        createViews(globalState, Randomly.fromOptions(4, 5, 6));
         prepareTables(globalState);
     }
 
@@ -78,6 +80,14 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
         }
     }
 
+    protected void createViews(FelderaGlobalState globalState, int numViews) throws Exception {
+        for (int i = 0; i < numViews; i++) {
+            FelderaOtherQuery createView = FelderaViewGenerator.generate(globalState);
+            System.out.println(createView);
+            globalState.executeStatement(createView);
+        }
+    }
+
     protected void prepareTables(FelderaGlobalState globalState) throws Exception {
         StatementExecutor<FelderaGlobalState, FelderaProvider.Action> se = new StatementExecutor<>(globalState, FelderaProvider.Action.values(),
                 sqlancer.feldera.FelderaProvider::mapActions, (q) -> {
@@ -99,7 +109,7 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     }
 
     public enum Action implements AbstractAction<FelderaGlobalState> {
-        INSERT(FelderaInsertGenerator::insert);
+        INSERT(FelderaInsertGenerator::getQuery);
 
         private final FelderaQueryProvider<FelderaGlobalState> sqlQueryProvider;
 

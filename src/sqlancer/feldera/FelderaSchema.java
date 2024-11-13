@@ -3,15 +3,12 @@ package sqlancer.feldera;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
-import sqlancer.common.schema.AbstractRowValue;
-import sqlancer.common.schema.AbstractSchema;
-import sqlancer.common.schema.AbstractTable;
-import sqlancer.common.schema.AbstractTableColumn;
-import sqlancer.common.schema.AbstractTables;
-import sqlancer.common.schema.TableIndex;
+import sqlancer.common.schema.*;
 import sqlancer.feldera.ast.FelderaConstant;
+import sqlancer.feldera.ast.FelderaExpression;
 
 public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSchema.FelderaTable> {
 
@@ -85,25 +82,55 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         public static FelderaDataType getRandomType() {
             return Randomly.fromOptions(values());
         }
+
+        public FelderaExpression getRandomConstant(FelderaGlobalState globalState) {
+            // TODO support NULL constants
+//        if (Randomly.getBooleanWithSmallProbability()) {
+//            return FelderaConstant.createNullConstant();
+//        }
+            switch (this) {
+                case INT:
+                    return FelderaConstant.createIntConstant(globalState.getRandomly().getInteger());
+                case DOUBLE:
+                    // TODO: support infinite doubles
+                    return FelderaConstant.createDoubleConstant(globalState.getRandomly().getFiniteDouble());
+                case VARCHAR:
+                    return FelderaConstant.createVarcharConstant(globalState.getRandomly().getString());
+                case BOOLEAN:
+                    return FelderaConstant.createBooleanConstant(Randomly.getBoolean());
+                default:
+                    throw new AssertionError(this);
+            }
+        }
     }
 
     public static class FelderaFieldColumn extends FelderaColumn {
         public FelderaFieldColumn(String name, FelderaDataType columnType) {
             super(name, columnType);
+        }
+
+        public FelderaFieldColumn(String name, FelderaDataType columnType, boolean isNullable) {
+            super(name, columnType, isNullable);
             // later, you can assert that the Field column isn't something like INTERVAL
         }
     }
 
     public static class FelderaColumn extends AbstractTableColumn<FelderaTable, FelderaDataType> {
 
+        private final boolean isNullable;
         public FelderaColumn(String name, FelderaDataType columnType) {
             super(name, null, columnType);
+            this.isNullable = false;
         }
 
-        public static FelderaColumn createDummy(String name) {
-            return new FelderaColumn(name, FelderaDataType.INT);
+        public FelderaColumn(String name, FelderaDataType columnType, boolean isNullable) {
+            super(name, null, columnType);
+            this.isNullable = isNullable;
         }
 
+        public boolean isNullable() {
+            return isNullable;
+        }
     }
 
     public static class FelderaTables extends AbstractTables<FelderaTable, FelderaColumn> {
@@ -139,15 +166,8 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
             return 0;
         }
 
-        @Override
-        public List<FelderaColumn> getRandomNonEmptyColumnSubset() {
-//            List<FelderaColumn> selectedColumns = new ArrayList<>();
-//            ArrayList<FelderaColumn> remainingColumns = new ArrayList<>(this.getColumns());
-
-
-            // TODO
-
-            return new ArrayList<>();
+        public static List<FelderaColumn> getAllColumns(List<FelderaTable> tables) {
+            return tables.stream().map(AbstractTable::getColumns).flatMap(List::stream).collect(Collectors.toList());
         }
     }
 

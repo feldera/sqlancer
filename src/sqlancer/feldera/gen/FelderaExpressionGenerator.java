@@ -1,14 +1,25 @@
 package sqlancer.feldera.gen;
 
 import sqlancer.Randomly;
+import sqlancer.common.gen.NoRECGenerator;
 import sqlancer.common.gen.TypedExpressionGenerator;
+import sqlancer.common.schema.AbstractTables;
 import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.FelderaSchema;
-import sqlancer.feldera.ast.FelderaConstant;
-import sqlancer.feldera.ast.FelderaExpression;
+import sqlancer.feldera.ast.*;
 
-public class FelderaExpressionGenerator extends TypedExpressionGenerator<FelderaExpression, FelderaSchema.FelderaColumn, FelderaSchema.FelderaDataType> {
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
+public final class FelderaExpressionGenerator
+        extends TypedExpressionGenerator<FelderaExpression, FelderaSchema.FelderaColumn, FelderaSchema.FelderaDataType>
+    implements NoRECGenerator<FelderaSelect, FelderaJoin, FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn>
+{
+
+    @SuppressWarnings("unused")
+    private List<FelderaSchema.FelderaTable> tables;
     private final FelderaGlobalState globalState;
 
     public FelderaExpressionGenerator(FelderaGlobalState globalState) {
@@ -16,8 +27,54 @@ public class FelderaExpressionGenerator extends TypedExpressionGenerator<Feldera
     }
 
     @Override
+    protected FelderaSchema.FelderaDataType getRandomType() {
+        return FelderaSchema.FelderaDataType.getRandomType();
+    }
+
+    @Override
+    protected boolean canGenerateColumnOfType(FelderaSchema.FelderaDataType type) {
+        return true;
+    }
+
+
+    @Override
+    protected FelderaExpression generateExpression(FelderaSchema.FelderaDataType type, int depth) {
+        FelderaSchema.FelderaDataType expectedType = type;
+        if (Randomly.getBooleanWithRatherLowProbability()) {
+            expectedType = FelderaSchema.FelderaDataType.getRandomType();
+        }
+        return generateLeafNode(expectedType);
+    }
+
+    List<FelderaSchema.FelderaColumn> filterColumns(FelderaSchema.FelderaDataType type) {
+        if (columns == null) {
+            return Collections.emptyList();
+        } else {
+            return columns.stream().filter(c -> c.getType() == type).collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    protected FelderaExpression generateColumn(FelderaSchema.FelderaDataType type) {
+        // HACK: if no col of such type exists, generate constant value instead
+        List<FelderaSchema.FelderaColumn> colsOfType = filterColumns(type);
+        if (colsOfType.isEmpty()) {
+            return generateConstant(type);
+        }
+
+        FelderaSchema.FelderaColumn column = Randomly.fromList(colsOfType);
+        return new FelderaColumnReference(column);
+    }
+
+
+    @Override
+    public FelderaExpression generateConstant(FelderaSchema.FelderaDataType type) {
+        return type.getRandomConstant(globalState);
+    }
+
+    @Override
     public FelderaExpression generatePredicate() {
-        return null;
+        return generateExpression(FelderaSchema.FelderaDataType.BOOLEAN, 0);
     }
 
     @Override
@@ -31,43 +88,45 @@ public class FelderaExpressionGenerator extends TypedExpressionGenerator<Feldera
     }
 
     @Override
-    public FelderaExpression generateConstant(FelderaSchema.FelderaDataType type) {
-        // TODO support NULL constants
-//        if (Randomly.getBooleanWithSmallProbability()) {
-//            return FelderaConstant.createNullConstant();
-//        }
-        switch (type) {
-            case INT:
-                return FelderaConstant.createIntConstant(globalState.getRandomly().getInteger());
-            case DOUBLE:
-                // TODO: support infinite doubles
-                return FelderaConstant.createDoubleConstant(globalState.getRandomly().getFiniteDouble());
-            case VARCHAR:
-                return FelderaConstant.createVarcharConstant(globalState.getRandomly().getString());
-            case BOOLEAN:
-                return FelderaConstant.createBooleanConstant(Randomly.getBoolean());
-            default:
-                throw new AssertionError(type);
+    public FelderaExpressionGenerator setTablesAndColumns(AbstractTables<FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn> tables) {
+        List<FelderaSchema.FelderaTable> randomTables = Randomly.nonEmptySubset(tables.getTables());
+        int maxSize = Randomly.fromOptions(1, 2, 3, 4);
+        if (randomTables.size() > maxSize) {
+            randomTables = randomTables.subList(0, maxSize);
         }
+        this.columns = FelderaSchema.FelderaTable.getAllColumns(randomTables);
+        this.tables = randomTables;
+
+        return this;
     }
 
     @Override
-    protected FelderaExpression generateExpression(FelderaSchema.FelderaDataType type, int depth) {
+    public FelderaExpression generateBooleanExpression() {
+        return generateExpression(FelderaSchema.FelderaDataType.BOOLEAN);
+    }
+
+    @Override
+    public FelderaSelect generateSelect() {
+        return new FelderaSelect();
+    }
+
+    @Override
+    public List<FelderaJoin> getRandomJoinClauses() {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public List<FelderaExpression> getTableRefs() {
         return null;
     }
 
     @Override
-    protected FelderaExpression generateColumn(FelderaSchema.FelderaDataType type) {
+    public String generateOptimizedQueryString(FelderaSelect select, FelderaExpression whereCondition, boolean shouldUseAggregate) {
         return null;
     }
 
     @Override
-    protected FelderaSchema.FelderaDataType getRandomType() {
+    public String generateUnoptimizedQueryString(FelderaSelect select, FelderaExpression whereCondition) {
         return null;
-    }
-
-    @Override
-    protected boolean canGenerateColumnOfType(FelderaSchema.FelderaDataType type) {
-        return false;
     }
 }
