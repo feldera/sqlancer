@@ -5,6 +5,7 @@ import sqlancer.*;
 import com.google.auto.service.AutoService;
 import sqlancer.common.log.LoggableFactory;
 
+import sqlancer.common.oracle.TestOracle;
 import sqlancer.feldera.client.FelderaClient;
 import sqlancer.feldera.gen.FelderaInsertGenerator;
 import sqlancer.feldera.gen.FelderaTableGenerator;
@@ -13,6 +14,7 @@ import sqlancer.feldera.query.FelderaOtherQuery;
 import sqlancer.feldera.query.FelderaQueryProvider;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 
 @AutoService(DatabaseProvider.class)
@@ -62,7 +64,6 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
             HashMap<String, Object> map = client.get();
             if (map != null) {
                 globalState.getState().logStatement("pipeline " + pipelineName + " exists, shutting down");
-                client.shutdown();
             }
 
             return connection;
@@ -82,9 +83,10 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
 
     protected void createViews(FelderaGlobalState globalState, int numViews) throws Exception {
         for (int i = 0; i < numViews; i++) {
-            FelderaOtherQuery createView = FelderaViewGenerator.generate(globalState);
-            System.out.println(createView);
-            globalState.executeStatement(createView);
+            List<FelderaOtherQuery> views = FelderaViewGenerator.generate(globalState);
+            for (FelderaOtherQuery view: views) {
+                globalState.executeStatement(view);
+            }
         }
     }
 
@@ -101,6 +103,34 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     @Override
     public String getDBMSName() {
         return "feldera";
+    }
+
+    @Override
+    public Reproducer<FelderaGlobalState> generateAndTestDatabase(FelderaGlobalState globalState) throws Exception {
+        try {
+            generateDatabase(globalState);
+            globalState.getManager().incrementCreateDatabase();
+
+            TestOracle<FelderaGlobalState> oracle = getTestOracle(globalState);
+            try (StateToReproduce.OracleRunReproductionState localState = globalState.getState().createLocalState()) {
+                assert localState != null;
+                try {
+                    oracle.check();
+                    globalState.getManager().incrementSelectQueryCount();
+                } catch (IgnoreMeException ignored) {
+                } catch (AssertionError e) {
+                    Reproducer<FelderaGlobalState> reproducer = oracle.getLastReproducer();
+                    if (reproducer != null) {
+                        return reproducer;
+                    }
+                    throw e;
+                }
+                localState.executedWithoutError();
+            }
+        } finally {
+            globalState.getConnection().close();
+        }
+        return null;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package sqlancer.feldera.gen;
 
 import sqlancer.Randomly;
+import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.feldera.FelderaSchema;
 import sqlancer.feldera.query.FelderaOtherQuery;
@@ -26,12 +27,12 @@ public class FelderaTableGenerator {
         sb.append(tableName);
         sb.append("(");
 
-        for (int i = 0; i < Randomly.smallNumber() + 1; i++) {
+        int nrColumns = Randomly.smallNumber() + 1;
+        for (int i = 0; i < nrColumns; i++) {
             if (i != 0) {
                 sb.append(", ");
             }
-            String name = String.format("c%d", i);
-            createField(name);
+            createField(DBMSCommon.createColumnName(i));
         }
 
         sb.append(") with ('materialized' = 'true');\n");
@@ -45,7 +46,6 @@ public class FelderaTableGenerator {
         FelderaCommon.appendDataType(type, sb);
         FelderaSchema.FelderaFieldColumn c = new FelderaSchema.FelderaFieldColumn(name, type);
         c.setTable(table);
-        sb.append(" ");
         columnsToBeAdded.add(c);
     }
 

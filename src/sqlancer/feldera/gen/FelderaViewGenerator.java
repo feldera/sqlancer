@@ -1,34 +1,69 @@
 package sqlancer.feldera.gen;
 
 import sqlancer.Randomly;
-import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.feldera.FelderaGlobalState;
-import sqlancer.feldera.FelderaToStringVisitor;
+import sqlancer.feldera.ast.FelderaExpression;
 import sqlancer.feldera.ast.FelderaSelect;
 import sqlancer.feldera.query.FelderaOtherQuery;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class FelderaViewGenerator {
     private static int counter = 0;
     public FelderaViewGenerator() {
     }
 
-    public static FelderaOtherQuery generate(FelderaGlobalState globalState) {
+    private static String createViewName(int n) {
+        return "v" + n;
+    }
+
+    public static List<FelderaOtherQuery> generate(FelderaGlobalState globalState) {
+        int nrColumns = Randomly.smallNumber() + 1;
+        List<FelderaOtherQuery> queries = new ArrayList<>();
+        FelderaSelect select = FelderaRandomQueryGenerator.createRandomQuery(nrColumns, globalState);
+
+        FelderaExpressionGenerator gen = new FelderaExpressionGenerator(globalState);
+        FelderaExpression whereCondition = gen.generateBooleanExpression();
+
+        queries.add(generateViewFromSelect(select, gen, whereCondition, counter, true));
+        queries.add(generateViewFromSelect(select, gen, whereCondition, counter, false));
+        globalState.addView(createViewName(counter++));
+        return queries;
+    }
+
+    private static FelderaOtherQuery generateViewFromSelect(
+            FelderaSelect select,
+            FelderaExpressionGenerator gen,
+            FelderaExpression whereCondition,
+            int viewNumber,
+            boolean optimized
+    ) {
         ExpectedErrors errors = new ExpectedErrors();
         StringBuilder sb = new StringBuilder("CREATE MATERIALIZED VIEW ");
-        sb.append("v");
-        sb.append(counter++);
-        int nrColumns = Randomly.smallNumber() + 1;
-        sb.append("(");
-        for (int i = 0; i < nrColumns; i++) {
-            if (i != 0) {
-                sb.append(", ");
-            }
-            sb.append(DBMSCommon.createColumnName(i));
+        String name = createViewName(viewNumber);
+        sb.append(name);
+        if (optimized) {
+            sb.append("_optimized");
         }
-        sb.append(") AS (");
-        FelderaSelect select = FelderaRandomQueryGenerator.createRandomQuery(nrColumns, globalState);
-        sb.append(FelderaToStringVisitor.asString(select));
+
+        sb.append(" AS (");
+        String selectQuery;
+
+        if (optimized) {
+            selectQuery = gen.generateOptimizedQueryString(
+                    select,
+                    whereCondition,
+                    Randomly.getBoolean()
+            );
+        } else {
+            selectQuery = gen.generateUnoptimizedQueryString(
+                    select,
+                    whereCondition
+            );
+        }
+        sb.append(selectQuery);
         sb.append(");\n");
         return new FelderaOtherQuery(sb.toString(), errors);
     }

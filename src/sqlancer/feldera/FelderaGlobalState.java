@@ -4,7 +4,12 @@ import sqlancer.ExecutionTimer;
 import sqlancer.GlobalState;
 import sqlancer.common.query.Query;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchema, FelderaConnection> {
+    List<String> views = new ArrayList<>();
+
     @Override
     protected void executeEpilogue(Query<?> q, boolean success, ExecutionTimer timer) throws Exception {
         boolean logExecutionTime = getOptions().logExecutionTime();
@@ -40,5 +45,13 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
             sch = new FelderaSchema(getConnection().getClient().pipelineName());
         }
         setSchema(sch.addTable(table));
+    }
+
+    public void addView(String view) {
+        this.views.add(view);
+    }
+
+    public List<String> getViews() {
+        return this.views;
     }
 }

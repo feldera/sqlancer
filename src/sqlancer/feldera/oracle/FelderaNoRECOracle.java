@@ -3,10 +3,10 @@ package sqlancer.feldera.oracle;
 import sqlancer.Main;
 import sqlancer.MainOptions;
 import sqlancer.common.oracle.TestOracle;
-import sqlancer.common.query.ExpectedErrors;
 import sqlancer.feldera.FelderaConnection;
 import sqlancer.feldera.FelderaGlobalState;
-import sqlancer.feldera.FelderaSchema;
+
+import java.util.HashMap;
 
 public class FelderaNoRECOracle
         implements TestOracle<FelderaGlobalState> {
@@ -15,16 +15,8 @@ public class FelderaNoRECOracle
     protected final Main.StateLogger logger;
     protected final MainOptions options;
     protected final FelderaConnection con;
-    @SuppressWarnings("unused")
-    private final FelderaSchema schema;
-    @SuppressWarnings("unused")
-    private final ExpectedErrors errors;
-    @SuppressWarnings("unused")
-    private String lastQueryString;
 
     public FelderaNoRECOracle(FelderaGlobalState state) {
-        this.schema = state.getSchema();
-        this.errors = new ExpectedErrors();
         this.state = state;
         this.con = state.getConnection();
         this.logger = state.getLogger();
@@ -33,5 +25,12 @@ public class FelderaNoRECOracle
 
     @Override
     public void check() throws Exception {
+        for (String view: state.getViews()) {
+            String query = String.format("select * from %s except select * from %s_optimized", view, view);
+            HashMap<String, Object> ret = con.getClient().executeSelect(query);
+            if (!ret.isEmpty()) {
+                throw new AssertionError("query failed: " + query);
+            }
+        }
     }
 }

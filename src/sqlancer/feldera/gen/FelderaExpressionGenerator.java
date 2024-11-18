@@ -6,6 +6,7 @@ import sqlancer.common.gen.TypedExpressionGenerator;
 import sqlancer.common.schema.AbstractTables;
 import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.FelderaSchema;
+import sqlancer.feldera.FelderaToStringVisitor;
 import sqlancer.feldera.ast.*;
 
 import java.util.ArrayList;
@@ -21,9 +22,12 @@ public final class FelderaExpressionGenerator
     @SuppressWarnings("unused")
     private List<FelderaSchema.FelderaTable> tables;
     private final FelderaGlobalState globalState;
+    @SuppressWarnings("unused")
+    private final int maxDepth;
 
     public FelderaExpressionGenerator(FelderaGlobalState globalState) {
         this.globalState = globalState;
+        this.maxDepth = globalState.getOptions().getMaxExpressionDepth();
     }
 
     @Override
@@ -39,11 +43,7 @@ public final class FelderaExpressionGenerator
 
     @Override
     protected FelderaExpression generateExpression(FelderaSchema.FelderaDataType type, int depth) {
-        FelderaSchema.FelderaDataType expectedType = type;
-        if (Randomly.getBooleanWithRatherLowProbability()) {
-            expectedType = FelderaSchema.FelderaDataType.getRandomType();
-        }
-        return generateLeafNode(expectedType);
+        return generateLeafNode(type);
     }
 
     List<FelderaSchema.FelderaColumn> filterColumns(FelderaSchema.FelderaDataType type) {
@@ -122,11 +122,19 @@ public final class FelderaExpressionGenerator
 
     @Override
     public String generateOptimizedQueryString(FelderaSelect select, FelderaExpression whereCondition, boolean shouldUseAggregate) {
-        return null;
+        select.setFetchColumnString("COUNT(*)");
+        select.setWhereClause(whereCondition);
+
+        return select.asString();
     }
 
     @Override
     public String generateUnoptimizedQueryString(FelderaSelect select, FelderaExpression whereCondition) {
-        return null;
+        String fetchColumn = String.format("COUNT((CASE WHEN %S THEN 1 ELSE NULL END))",
+                FelderaToStringVisitor.asString(whereCondition));
+        select.setFetchColumnString(fetchColumn);
+        select.setWhereClause(null);
+
+        return select.asString();
     }
 }

@@ -111,11 +111,11 @@ public class FelderaClient {
         }
 
         if (status < 200 || status > 299) {
-            throw new FelderaException("error: got status " + status + " back from feldera, expected 2xx");
+            throw new FelderaException("error: got status " + status + " back from feldera, expected 2xx\n ddl: " + ddl);
         }
     }
 
-    private void blockTillDesiredState(String desired) throws FelderaException {
+    public void blockTillDesiredState(String desired) throws FelderaException {
         while (true) {
             Map<String, Object> map = this.get();
             if (map == null) {
@@ -133,19 +133,11 @@ public class FelderaClient {
         blockTillDesiredState("running");
     }
 
-    @SuppressWarnings("unused")
-    public void restart() throws FelderaException {
-        this.shutdown();
-        this.start();
-    }
-
-    @SuppressWarnings("unused")
     public void pause() throws FelderaException {
         changePipelineState("pause");
         blockTillDesiredState("paused");
     }
 
-    @SuppressWarnings("unused")
     public void shutdown() throws FelderaException {
         changePipelineState("shutdown");
         blockTillDesiredState("shutdown");
@@ -166,16 +158,29 @@ public class FelderaClient {
         }
     }
 
-    private void executeAdhocQuery(String query) throws FelderaException {
+    public HashMap<String, Object> executeSelect(String select) throws FelderaException {
+        this.pause();
+        return this.executeAdhocQuery(select);
+    }
+
+    private HashMap<String, Object> executeAdhocQuery(String query) throws FelderaException {
         Map<String, String> params = new HashMap<>();
         params.put("pipeline_name", this.pipelineName());
         params.put("sql", query);
-        params.put("format", "text"); // TODO: change to json
+        params.put("format", "json");
 
         HttpGet httpGet = createHttpGet(this.pipelineUrl("query"), params);
         try {
             CloseableHttpResponse resp = this.client.execute(httpGet);
-            resp.close();
+
+            String json = EntityUtils.toString(resp.getEntity());
+            if (json.isBlank()) {
+                return new HashMap<>();
+            }
+            ObjectMapper mapper = new ObjectMapper();
+            TypeFactory typeFactory = mapper.getTypeFactory();
+            MapType mapType = typeFactory.constructMapType(HashMap.class, String.class, Object.class);
+            return mapper.readValue(json, mapType);
         } catch (IOException e) {
             throw new FelderaException("error: failed to execute adhoc query: " + e);
         }

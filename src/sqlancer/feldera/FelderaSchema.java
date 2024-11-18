@@ -1,5 +1,7 @@
 package sqlancer.feldera;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -83,19 +85,28 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
             return Randomly.fromOptions(values());
         }
 
+        private static double round(double number, int places) {
+            BigDecimal decimal = new BigDecimal(number);
+            decimal = decimal.setScale(places, RoundingMode.HALF_UP);
+            return decimal.doubleValue();
+        }
+
         public FelderaExpression getRandomConstant(FelderaGlobalState globalState) {
-            // TODO support NULL constants
-//        if (Randomly.getBooleanWithSmallProbability()) {
-//            return FelderaConstant.createNullConstant();
-//        }
+            if (Randomly.getBooleanWithSmallProbability()) {
+                return FelderaConstant.createNullConstant();
+            }
             switch (this) {
                 case INT:
                     return FelderaConstant.createIntConstant(globalState.getRandomly().getInteger());
                 case DOUBLE:
                     // TODO: support infinite doubles
-                    return FelderaConstant.createDoubleConstant(globalState.getRandomly().getFiniteDouble());
+                    return FelderaConstant.createDoubleConstant(
+                            round(globalState.getRandomly().getFiniteDouble(), 10)
+                    );
                 case VARCHAR:
-                    return FelderaConstant.createVarcharConstant(globalState.getRandomly().getString());
+                    return FelderaConstant.createVarcharConstant(
+                            globalState.getRandomly().getString().replaceAll("[^\\x00-\\x7F]", "")
+                    );
                 case BOOLEAN:
                     return FelderaConstant.createBooleanConstant(Randomly.getBoolean());
                 default:

@@ -14,7 +14,7 @@ public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression
         } else if (expr instanceof FelderaJoin) {
             visit((FelderaJoin) expr);
         } else {
-            throw new AssertionError(expr.getClass());
+            throw new AssertionError(expr.toString());
         }
     }
 
@@ -39,7 +39,11 @@ public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression
         if (select.isDistinct()) {
             sb.append("DISTINCT ");
         }
-        visit(select.getFetchColumns());
+        if (select.fetchColumnString.isPresent()) {
+            sb.append(select.fetchColumnString.get());
+        } else {
+            visit(select.getFetchColumns());
+        }
         sb.append(" FROM ");
         visit(select.getFromList());
         if (!select.getFromList().isEmpty() && !select.getJoinList().isEmpty()) {
