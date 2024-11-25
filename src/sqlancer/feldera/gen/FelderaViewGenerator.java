@@ -1,6 +1,7 @@
 package sqlancer.feldera.gen;
 
 import sqlancer.Randomly;
+import sqlancer.common.oracle.TestOracleUtils;
 import sqlancer.common.query.ExpectedErrors;
 import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.ast.FelderaExpression;
@@ -12,6 +13,7 @@ import java.util.List;
 
 public class FelderaViewGenerator {
     private static int counter = 0;
+
     public FelderaViewGenerator() {
     }
 
@@ -20,11 +22,10 @@ public class FelderaViewGenerator {
     }
 
     public static List<FelderaOtherQuery> generate(FelderaGlobalState globalState) {
-        int nrColumns = Randomly.smallNumber() + 1;
         List<FelderaOtherQuery> queries = new ArrayList<>();
-        FelderaSelect select = FelderaRandomQueryGenerator.createRandomQuery(nrColumns, globalState);
-
-        FelderaExpressionGenerator gen = new FelderaExpressionGenerator(globalState);
+        FelderaExpressionGenerator gen = new FelderaExpressionGenerator(globalState)
+                .setTablesAndColumns(TestOracleUtils.getRandomTableNonEmptyTables(globalState.getSchema()));
+        FelderaSelect select = gen.generateSelect();
         FelderaExpression whereCondition = gen.generateBooleanExpression();
 
         queries.add(generateViewFromSelect(select, gen, whereCondition, counter, true));
@@ -33,13 +34,8 @@ public class FelderaViewGenerator {
         return queries;
     }
 
-    private static FelderaOtherQuery generateViewFromSelect(
-            FelderaSelect select,
-            FelderaExpressionGenerator gen,
-            FelderaExpression whereCondition,
-            int viewNumber,
-            boolean optimized
-    ) {
+    private static FelderaOtherQuery generateViewFromSelect(FelderaSelect select, FelderaExpressionGenerator gen,
+            FelderaExpression whereCondition, int viewNumber, boolean optimized) {
         ExpectedErrors errors = new ExpectedErrors();
         StringBuilder sb = new StringBuilder("CREATE MATERIALIZED VIEW ");
         String name = createViewName(viewNumber);
@@ -52,16 +48,9 @@ public class FelderaViewGenerator {
         String selectQuery;
 
         if (optimized) {
-            selectQuery = gen.generateOptimizedQueryString(
-                    select,
-                    whereCondition,
-                    Randomly.getBoolean()
-            );
+            selectQuery = gen.generateOptimizedQueryString(select, whereCondition, Randomly.getBoolean());
         } else {
-            selectQuery = gen.generateUnoptimizedQueryString(
-                    select,
-                    whereCondition
-            );
+            selectQuery = gen.generateUnoptimizedQueryString(select, whereCondition);
         }
         sb.append(selectQuery);
         sb.append(");\n");

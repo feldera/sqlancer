@@ -8,8 +8,7 @@ import sqlancer.feldera.FelderaGlobalState;
 
 import java.util.HashMap;
 
-public class FelderaNoRECOracle
-        implements TestOracle<FelderaGlobalState> {
+public class FelderaNoRECOracle implements TestOracle<FelderaGlobalState> {
 
     protected final FelderaGlobalState state;
     protected final Main.StateLogger logger;
@@ -25,7 +24,7 @@ public class FelderaNoRECOracle
 
     @Override
     public void check() throws Exception {
-        for (String view: state.getViews()) {
+        for (String view : state.getViews()) {
             String query = String.format("select * from %s except select * from %s_optimized", view, view);
             HashMap<String, Object> ret = con.getClient().executeSelect(query);
             if (!ret.isEmpty()) {

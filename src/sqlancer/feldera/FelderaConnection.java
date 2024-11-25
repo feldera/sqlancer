@@ -12,7 +12,7 @@ public class FelderaConnection implements SQLancerDBConnection {
         this.client = client;
     }
 
-    public FelderaClient getClient()  {
+    public FelderaClient getClient() {
         return this.client;
     }
 

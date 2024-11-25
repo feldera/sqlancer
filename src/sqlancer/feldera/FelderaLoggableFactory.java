@@ -14,7 +14,7 @@ import java.io.StringWriter;
 public class FelderaLoggableFactory extends LoggableFactory {
     @Override
     protected Loggable createLoggable(String input, String suffix) {
-        String completeString = input;
+        String completeString = input.trim();
         if (!input.endsWith(";")) {
             completeString += ";";
         }

@@ -15,6 +15,7 @@ import org.apache.http.util.EntityUtils;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -23,6 +24,7 @@ public class FelderaClient {
     private final String url;
     private final String pipeline;
     private final CloseableHttpClient client;
+    private final ArrayList<String> inserts = new ArrayList<>();
 
     private String ddl = "";
 
@@ -32,6 +34,11 @@ public class FelderaClient {
         }
 
         return url + "v0/";
+    }
+
+    private FelderaException makeException(String error) {
+        return new FelderaException(
+                error + "\nPipeline: " + this.pipeline + "\nInserts: " + String.join("\n", inserts));
     }
 
     private String pipelineUrl() {
@@ -59,7 +66,7 @@ public class FelderaClient {
         try {
             this.client.execute(httpPut);
         } catch (IOException e) {
-            throw new FelderaException("error making put request to create an empty pipeline: " + e);
+            throw makeException("error making put request to create an empty pipeline: " + e);
         }
     }
 
@@ -76,7 +83,7 @@ public class FelderaClient {
             CloseableHttpResponse conn = this.client.execute(httpPatch);
             conn.close();
         } catch (IOException e) {
-            throw new FelderaException("error making put request to create an empty pipeline: " + e);
+            throw makeException("error making put request to create an empty pipeline: " + e);
         }
     }
 
@@ -89,29 +96,36 @@ public class FelderaClient {
     }
 
     public void executeQuery(String query) throws FelderaException {
+        this.inserts.add(query);
         this.waitForCompilation();
         this.start();
         this.executeAdhocQuery(query);
     }
 
     public void changePipelineState(String state) throws FelderaException {
+        Map<String, Object> get = this.get();
+        assert get != null : makeException("err: cannot change status, pipeline not found: " + this.pipeline);
+
+        String deployment_status = (String) get.get("deployment_status");
+        if (deployment_status.equalsIgnoreCase(state)) {
+            return;
+        } else if (deployment_status.equalsIgnoreCase("Failed")) {
+            throw makeException("err: pipeline '" + this.pipeline + "' is in failed state");
+        }
+
         HttpPost httpPost = new HttpPost(this.pipelineUrl(state));
         int status;
+        String json;
 
         try (CloseableHttpResponse resp = client.execute(httpPost)) {
             status = resp.getStatusLine().getStatusCode();
+            json = EntityUtils.toString(resp.getEntity());
         } catch (IOException e) {
-            throw new FelderaException("error: failed to change pipeline state: " + e);
-        }
-
-        if (status == 404) {
-            this.createEmptyPipeline();
-            this.changePipelineState(state);
-            return;
+            throw makeException("error: failed to change pipeline state: " + e);
         }
 
         if (status < 200 || status > 299) {
-            throw new FelderaException("error: got status " + status + " back from feldera, expected 2xx\n ddl: " + ddl);
+            throw makeException("error: failed to change pipeline state: got response:\n" + json);
         }
     }
 
@@ -119,7 +133,7 @@ public class FelderaClient {
         while (true) {
             Map<String, Object> map = this.get();
             if (map == null) {
-                throw new FelderaException("error: got empty response from feldera");
+                throw makeException("error: got empty response from feldera");
             }
             String deployment_status = (String) map.get("deployment_status");
             if (deployment_status.equalsIgnoreCase(desired)) {
@@ -129,6 +143,8 @@ public class FelderaClient {
     }
 
     public void start() throws FelderaException {
+        // HACK: weirdly sometimes we call /start before things compile sometimes
+        waitForCompilation();
         changePipelineState("start");
         blockTillDesiredState("running");
     }
@@ -154,7 +170,7 @@ public class FelderaClient {
 
             return new HttpGet(uri);
         } catch (Exception e) {
-            throw new FelderaException("error: failed to build HttpGet request to feldera: " + e);
+            throw makeException("error: failed to build HttpGet request to feldera: " + e);
         }
     }
 
@@ -182,7 +198,7 @@ public class FelderaClient {
             MapType mapType = typeFactory.constructMapType(HashMap.class, String.class, Object.class);
             return mapper.readValue(json, mapType);
         } catch (IOException e) {
-            throw new FelderaException("error: failed to execute adhoc query: " + e);
+            throw makeException("error: failed to execute adhoc query: " + e);
         }
     }
 
@@ -197,18 +213,19 @@ public class FelderaClient {
                 return null;
             }
 
+            String json = EntityUtils.toString(resp.getEntity());
+
             if (status != 200) {
-                throw new FelderaException(status);
+                throw makeException("err: got invalid response from feldera: " + status + "\nresp:\n" + json);
             }
 
-            String json = EntityUtils.toString(resp.getEntity());
             ObjectMapper mapper = new ObjectMapper();
             TypeFactory typeFactory = mapper.getTypeFactory();
             MapType mapType = typeFactory.constructMapType(HashMap.class, String.class, Object.class);
 
             return mapper.readValue(json, mapType);
         } catch (IOException e) {
-            throw new FelderaException("error: failed to get pipeline details: " + e);
+            throw makeException("error: failed to get pipeline details: " + e);
         }
     }
 
@@ -219,13 +236,29 @@ public class FelderaClient {
                 throw new AssertionError("error: pipeline not created yet, cant wait for compilation");
             }
 
-            String program_status = (String) map.get("program_status");
-            if (Objects.equals(program_status, "Success")) {
-                break;
+            Object program_status = map.get("program_status");
+            if (program_status instanceof String) {
+                if (Objects.equals(program_status, "Success")) {
+                    break;
+                }
+            } else if (program_status instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> err_map = (Map<String, Object>) program_status;
+                if (err_map.containsKey("SqlError")) {
+                    throw makeException("compilation error: " + err_map.get("SqlError").toString());
+                } else if (err_map.containsKey("RustError")) {
+                    throw makeException("compilation error: " + err_map.get("RustError").toString());
+                }
             }
 
-            if (!Objects.equals(program_status, "Pending") && !Objects.equals(program_status, "CompilingSql") && !Objects.equals(program_status, "CompilingRust")) {
-                throw new FelderaException("error: failed to compile program");
+            String deployment_status = (String) map.get("deployment_status");
+            if (Objects.equals(deployment_status, "Failed")) {
+                throw makeException("failed to deploy pipeline:\n" + map);
+            }
+
+            if (!Objects.equals(program_status, "Pending") && !Objects.equals(program_status, "CompilingSql")
+                    && !Objects.equals(program_status, "CompilingRust")) {
+                throw makeException("error: failed to compile program:\n" + map);
             }
         }
     }

@@ -26,7 +26,8 @@ public class FelderaInsertGenerator extends AbstractInsertGenerator<FelderaSchem
     private FelderaOtherQuery generate() {
         sb.append("INSERT INTO ");
         FelderaSchema.FelderaTable table = globalState.getSchema().getRandomTable(t -> !t.isView());
-        List<FelderaSchema.FelderaColumn> columns = table.getRandomNonEmptyColumnSubsetFilter(p -> !p.getName().equals("rowid"));
+        List<FelderaSchema.FelderaColumn> columns = table
+                .getRandomNonEmptyColumnSubsetFilter(p -> !p.getName().equals("rowid"));
         sb.append(table.getName());
         sb.append("(");
         sb.append(columns.stream().map(AbstractTableColumn::getName).collect(Collectors.joining(", ")));
@@ -40,6 +41,7 @@ public class FelderaInsertGenerator extends AbstractInsertGenerator<FelderaSchem
 
     @Override
     protected void insertValue(FelderaSchema.FelderaColumn column) {
-        sb.append(FelderaToStringVisitor.asString(new FelderaExpressionGenerator(globalState).generateConstant(column.getType())));
+        sb.append(FelderaToStringVisitor
+                .asString(new FelderaExpressionGenerator(globalState).generateConstant(column.getType())));
     }
 }

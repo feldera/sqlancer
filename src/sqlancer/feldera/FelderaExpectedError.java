@@ -6,7 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FelderaExpectedError {
-    private FelderaExpectedError() {}
+    private FelderaExpectedError() {
+    }
 
     public static List<String> getExpectedErrors() {
         return new ArrayList<>();

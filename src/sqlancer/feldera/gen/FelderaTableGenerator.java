@@ -42,7 +42,7 @@ public class FelderaTableGenerator {
     private void createField(String name) throws AssertionError {
         sb.append(name);
         sb.append(" ");
-        FelderaSchema.FelderaDataType type = FelderaSchema.FelderaDataType.getRandomType();
+        FelderaSchema.FelderaDataType type = FelderaSchema.FelderaDataType.getRandomNonNullType();
         FelderaCommon.appendDataType(type, sb);
         FelderaSchema.FelderaFieldColumn c = new FelderaSchema.FelderaFieldColumn(name, type);
         c.setTable(table);

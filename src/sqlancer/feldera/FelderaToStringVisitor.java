@@ -7,15 +7,63 @@ import sqlancer.feldera.ast.*;
 public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression> {
     @Override
     public void visitSpecific(FelderaExpression expr) {
+        if (expr.isBlackbox()) {
+            sb.append("blackbox(");
+        }
         if (expr instanceof FelderaConstant) {
             visit((FelderaConstant) expr);
         } else if (expr instanceof FelderaSelect) {
             visit((FelderaSelect) expr);
         } else if (expr instanceof FelderaJoin) {
             visit((FelderaJoin) expr);
+        } else if (expr instanceof FelderaCast) {
+            visit((FelderaCast) expr);
+        } else if (expr instanceof FelderaBetweenOperation) {
+            visit((FelderaBetweenOperation) expr);
+        } else if (expr instanceof FelderaFunctionCall) {
+            visit((FelderaFunctionCall) expr);
+        } else if (expr instanceof FelderaAggregate) {
+            visit((FelderaAggregate) expr);
         } else {
             throw new AssertionError(expr.toString());
         }
+        if (expr.isBlackbox()) {
+            sb.append(")");
+        }
+    }
+
+    private void visit(FelderaAggregate aggr) {
+        sb.append(aggr.getFunc().name());
+        sb.append("(");
+        visit(aggr.getExpr());
+        sb.append(")");
+    }
+
+    private void visit(FelderaCast cast) {
+        sb.append("(");
+        visit(cast.getExpression());
+        sb.append(cast.getStringRepresentation());
+        sb.append(")");
+    }
+
+    private void visit(FelderaBetweenOperation op) {
+        sb.append("(");
+        visit(op.getExpr());
+        sb.append(")");
+        sb.append(" ");
+        sb.append(op.getType().getStringRepresentation());
+        sb.append(" (");
+        visit(op.getLeft());
+        sb.append(") AND (");
+        visit(op.getRight());
+        sb.append(")");
+    }
+
+    private void visit(FelderaFunctionCall call) {
+        sb.append(call.getName());
+        sb.append("(");
+        visit(call.getArguments());
+        sb.append(")");
     }
 
     public void visit(FelderaJoin join) {
@@ -39,11 +87,7 @@ public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression
         if (select.isDistinct()) {
             sb.append("DISTINCT ");
         }
-        if (select.fetchColumnString.isPresent()) {
-            sb.append(select.fetchColumnString.get());
-        } else {
-            visit(select.getFetchColumns());
-        }
+        visit(select.getFetchColumns());
         sb.append(" FROM ");
         visit(select.getFromList());
         if (!select.getFromList().isEmpty() && !select.getJoinList().isEmpty()) {

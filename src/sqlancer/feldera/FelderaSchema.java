@@ -1,14 +1,13 @@
 package sqlancer.feldera;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
 import sqlancer.common.schema.*;
+import sqlancer.feldera.ast.FelderaColumnReference;
 import sqlancer.feldera.ast.FelderaConstant;
 import sqlancer.feldera.ast.FelderaExpression;
 
@@ -33,32 +32,36 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         return new FelderaSchema(tables, this.pipelineName);
     }
 
-    @Override
-    public String toString() {
-        StringBuilder dbg = new StringBuilder("FelderaSchema{" +
-                "pipelineName='" + pipelineName + '\n');
-
-        for (FelderaTable tbl: this.getDatabaseTablesWithoutViews()) {
-            dbg.append(tbl.toString());
-        }
-
-        dbg.append('}');
-
-        return dbg.toString();
-    }
-
     public static FelderaDataType getColumnType(String typeString) {
-        switch (typeString.toLowerCase()) {
-            case "bigint":
-                return FelderaDataType.INT;
-            case "boolean":
-                return FelderaDataType.BOOLEAN;
-            case "varchar":
-                return FelderaDataType.VARCHAR;
-            case "double":
-                return FelderaDataType.DOUBLE;
-            default:
-                throw new AssertionError(typeString);
+        switch (typeString.toUpperCase()) {
+        case "BOOLEAN":
+            return FelderaDataType.BOOLEAN;
+        case "TINYINT":
+            return FelderaDataType.TINYINT;
+        case "SMALLINT":
+            return FelderaDataType.SMALLINT;
+        case "INT":
+            return FelderaDataType.INT;
+        case "BIGINT":
+            return FelderaDataType.BIGINT;
+        case "VARCHAR":
+            return FelderaDataType.VARCHAR;
+        case "CHAR":
+            return FelderaDataType.CHAR;
+        case "NULL":
+            return FelderaDataType.NULL;
+        case "TIME":
+            return FelderaDataType.TIME;
+        case "DATE":
+            return FelderaDataType.DATE;
+        case "TIMESTAMP":
+            return FelderaDataType.TIMESTAMP;
+        case "REAL":
+            return FelderaDataType.REAL;
+        case "DOUBLE":
+            return FelderaDataType.DOUBLE;
+        default:
+            throw new AssertionError(typeString);
         }
     }
 
@@ -79,39 +82,51 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     }
 
     public enum FelderaDataType {
-        INT, BOOLEAN, VARCHAR, DOUBLE;
+        BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, VARCHAR, CHAR, NULL, TIME, DATE, TIMESTAMP,
+        // DECIMAL,
+        // VARBINARY,
+        // INTERVAL,
+        // GEOMETRY,
+        // ROW,
+        // ARRAY,
+        // MAP,
+        // VARIANT,
+        REAL, DOUBLE;
+
+        public static FelderaDataType getRandomNumericType() {
+            return Randomly
+                    .fromList(Arrays.stream(values()).filter(FelderaDataType::isNumeric).collect(Collectors.toList()));
+        }
+
+        public boolean isNumeric() {
+            switch (this) {
+            case REAL:
+            case DOUBLE:
+            case TINYINT:
+            case SMALLINT:
+            case INT:
+            case BIGINT:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        public static FelderaDataType getRandomNonNullType() {
+            return Randomly.fromList(
+                    Arrays.stream(values()).filter(t -> t != FelderaDataType.NULL).collect(Collectors.toList()));
+        }
 
         public static FelderaDataType getRandomType() {
             return Randomly.fromOptions(values());
-        }
-
-        private static double round(double number, int places) {
-            BigDecimal decimal = new BigDecimal(number);
-            decimal = decimal.setScale(places, RoundingMode.HALF_UP);
-            return decimal.doubleValue();
         }
 
         public FelderaExpression getRandomConstant(FelderaGlobalState globalState) {
             if (Randomly.getBooleanWithSmallProbability()) {
                 return FelderaConstant.createNullConstant();
             }
-            switch (this) {
-                case INT:
-                    return FelderaConstant.createIntConstant(globalState.getRandomly().getInteger());
-                case DOUBLE:
-                    // TODO: support infinite doubles
-                    return FelderaConstant.createDoubleConstant(
-                            round(globalState.getRandomly().getFiniteDouble(), 10)
-                    );
-                case VARCHAR:
-                    return FelderaConstant.createVarcharConstant(
-                            globalState.getRandomly().getString().replaceAll("[^\\x00-\\x7F]", "")
-                    );
-                case BOOLEAN:
-                    return FelderaConstant.createBooleanConstant(Randomly.getBoolean());
-                default:
-                    throw new AssertionError(this);
-            }
+
+            return FelderaConstant.getRandomConstant(globalState, this);
         }
     }
 
@@ -129,6 +144,7 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     public static class FelderaColumn extends AbstractTableColumn<FelderaTable, FelderaDataType> {
 
         private final boolean isNullable;
+
         public FelderaColumn(String name, FelderaDataType columnType) {
             super(name, null, columnType);
             this.isNullable = false;
@@ -137,6 +153,14 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         public FelderaColumn(String name, FelderaDataType columnType, boolean isNullable) {
             super(name, null, columnType);
             this.isNullable = isNullable;
+        }
+
+        public FelderaColumnReference asColumnReference() {
+            return new FelderaColumnReference(this);
+        }
+
+        public static FelderaColumn createDummy(String name) {
+            return new FelderaColumn(name, FelderaDataType.getRandomType());
         }
 
         public boolean isNullable() {
@@ -149,19 +173,6 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         public FelderaTables(List<FelderaTable> tables) {
             super(tables);
         }
-
-        public FelderaRowValue getRandomRowValue(FelderaConnection con) {
-            return null;
-        }
-
-    }
-
-    public static class FelderaRowValue extends AbstractRowValue<FelderaTables, FelderaColumn, FelderaConstant> {
-
-        protected FelderaRowValue(FelderaTables tables, Map<FelderaColumn, FelderaConstant> values) {
-            super(tables, values);
-        }
-
     }
 
     public static class FelderaTable extends AbstractTable<FelderaColumn, TableIndex, FelderaGlobalState> {

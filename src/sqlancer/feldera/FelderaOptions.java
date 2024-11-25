@@ -7,8 +7,7 @@ import com.beust.jcommander.Parameters;
 
 import sqlancer.DBMSSpecificOptions;
 
-@Parameters(separators = "=", commandDescription = "Feldera (default "
-        +  FelderaOptions.DEFAULT_URL + ")")
+@Parameters(separators = "=", commandDescription = "Feldera (default " + FelderaOptions.DEFAULT_URL + ")")
 public class FelderaOptions implements DBMSSpecificOptions<FelderaOracleFactory> {
 
     public static final String DEFAULT_URL = "http://127.0.0.1:8080";

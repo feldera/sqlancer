@@ -36,7 +36,7 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
 
     @Override
     protected FelderaSchema readSchema() throws Exception {
-       return FelderaSchema.fromConnection(getConnection());
+        return FelderaSchema.fromConnection(getConnection());
     }
 
     public void addTable(FelderaSchema.FelderaTable table) {

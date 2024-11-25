@@ -8,7 +8,8 @@ import sqlancer.feldera.FelderaSchema;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FelderaJoin implements FelderaExpression, Join<FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn> {
+public class FelderaJoin
+        implements FelderaExpression, Join<FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn> {
 
     private final FelderaTableReference leftTable;
     private final FelderaTableReference rightTable;
@@ -24,7 +25,7 @@ public class FelderaJoin implements FelderaExpression, Join<FelderaExpression, F
     }
 
     public FelderaJoin(FelderaTableReference leftTable, FelderaTableReference rightTable, FelderaJoinType joinType,
-                       FelderaExpression whereCondition) {
+            FelderaExpression whereCondition) {
         this.leftTable = leftTable;
         this.rightTable = rightTable;
         this.joinType = joinType;

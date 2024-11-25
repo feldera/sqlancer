@@ -84,19 +84,19 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     protected void createViews(FelderaGlobalState globalState, int numViews) throws Exception {
         for (int i = 0; i < numViews; i++) {
             List<FelderaOtherQuery> views = FelderaViewGenerator.generate(globalState);
-            for (FelderaOtherQuery view: views) {
+            for (FelderaOtherQuery view : views) {
                 globalState.executeStatement(view);
             }
         }
     }
 
     protected void prepareTables(FelderaGlobalState globalState) throws Exception {
-        StatementExecutor<FelderaGlobalState, FelderaProvider.Action> se = new StatementExecutor<>(globalState, FelderaProvider.Action.values(),
-                sqlancer.feldera.FelderaProvider::mapActions, (q) -> {
-            if (globalState.getSchema().getDatabaseTables().isEmpty()) {
-                throw new IgnoreMeException();
-            }
-        });
+        StatementExecutor<FelderaGlobalState, FelderaProvider.Action> se = new StatementExecutor<>(globalState,
+                FelderaProvider.Action.values(), sqlancer.feldera.FelderaProvider::mapActions, (q) -> {
+                    if (globalState.getSchema().getDatabaseTables().isEmpty()) {
+                        throw new IgnoreMeException();
+                    }
+                });
         se.executeStatements();
     }
 

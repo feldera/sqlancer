@@ -6,23 +6,19 @@ import sqlancer.feldera.FelderaSchema;
 import sqlancer.feldera.FelderaToStringVisitor;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class FelderaSelect extends SelectBase<FelderaExpression>
-implements Select<FelderaJoin, FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn>, FelderaExpression {
-    public Optional<String> fetchColumnString = Optional.empty();
+        implements Select<FelderaJoin, FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn>,
+        FelderaExpression {
     private boolean isDistinct;
+
     public void setDistinct(boolean isDistinct) {
         this.isDistinct = isDistinct;
     }
 
     public boolean isDistinct() {
         return isDistinct;
-    }
-
-    public void setFetchColumnString(String selectExpr) {
-        this.fetchColumnString = Optional.of(selectExpr);
     }
 
     @Override
