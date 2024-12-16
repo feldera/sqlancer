@@ -40,7 +40,7 @@ public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression
     }
 
     private void visit(FelderaCast cast) {
-        sb.append("(");
+        sb.append("CAST(");
         visit(cast.getExpression());
         sb.append(cast.getStringRepresentation());
         sb.append(")");
@@ -107,6 +107,10 @@ public class FelderaToStringVisitor extends NewToStringVisitor<FelderaExpression
         if (select.getHavingClause() != null) {
             sb.append(" HAVING ");
             visit(select.getHavingClause());
+        }
+        if (!select.getOrderByClauses().isEmpty()) {
+            sb.append(" ORDER BY ");
+            visit(select.getOrderByClauses());
         }
         if (!select.getOrderByClauses().isEmpty()) {
             sb.append(" LIMIT ");

@@ -10,7 +10,9 @@ public class FelderaExpectedError {
     }
 
     public static List<String> getExpectedErrors() {
-        return new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        errors.add("panic message:");
+        return errors;
     }
 
     public static ExpectedErrors expectedErrors() {

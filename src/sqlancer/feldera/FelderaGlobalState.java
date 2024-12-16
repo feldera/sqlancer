@@ -25,7 +25,7 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
     }
 
     @Override
-    public void updateSchema() throws Exception {
+    public void updateSchema() {
         ; // do nothing
     }
 
@@ -42,7 +42,7 @@ public class FelderaGlobalState extends GlobalState<FelderaOptions, FelderaSchem
     public void addTable(FelderaSchema.FelderaTable table) {
         FelderaSchema sch = getSchema();
         if (sch == null) {
-            sch = new FelderaSchema(getConnection().getClient().pipelineName());
+            sch = new FelderaSchema(getConnection().getPipelineName());
         }
         setSchema(sch.addTable(table));
     }

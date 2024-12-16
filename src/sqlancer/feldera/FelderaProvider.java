@@ -6,14 +6,12 @@ import com.google.auto.service.AutoService;
 import sqlancer.common.log.LoggableFactory;
 
 import sqlancer.common.oracle.TestOracle;
-import sqlancer.feldera.client.FelderaClient;
 import sqlancer.feldera.gen.FelderaInsertGenerator;
 import sqlancer.feldera.gen.FelderaTableGenerator;
 import sqlancer.feldera.gen.FelderaViewGenerator;
 import sqlancer.feldera.query.FelderaOtherQuery;
 import sqlancer.feldera.query.FelderaQueryProvider;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -58,12 +56,12 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
     public FelderaConnection createDatabase(FelderaGlobalState globalState) throws Exception {
         url = globalState.getDbmsSpecificOptions().connection_url;
         pipelineName = globalState.getDatabaseName();
-        FelderaClient client = new FelderaClient(url, pipelineName);
 
-        try (FelderaConnection connection = new FelderaConnection(client)) {
-            HashMap<String, Object> map = client.get();
-            if (map != null) {
-                globalState.getState().logStatement("pipeline " + pipelineName + " exists, shutting down");
+        try (FelderaConnection connection = new FelderaConnection(url, pipelineName)) {
+            try {
+                connection.get();
+                connection.shutdown();
+            } catch (Exception ignored) {
             }
 
             return connection;
@@ -83,9 +81,11 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
 
     protected void createViews(FelderaGlobalState globalState, int numViews) throws Exception {
         for (int i = 0; i < numViews; i++) {
-            List<FelderaOtherQuery> views = FelderaViewGenerator.generate(globalState);
+            String viewName = String.format("v%d", i);
+            List<FelderaOtherQuery> views = FelderaViewGenerator.generate(globalState, viewName);
             for (FelderaOtherQuery view : views) {
                 globalState.executeStatement(view);
+                globalState.addView(viewName);
             }
         }
     }

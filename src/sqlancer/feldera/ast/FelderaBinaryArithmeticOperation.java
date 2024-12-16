@@ -8,7 +8,7 @@ public class FelderaBinaryArithmeticOperation extends NewBinaryOperatorNode<Feld
         implements FelderaExpression {
 
     public enum FelderaBinaryArithmeticOperator implements BinaryOperatorNode.Operator {
-        ADD("+"), MULT("*"), MINUS("-"), DIV("/");
+        ADD("+"), MULT("*"), MINUS("-"), DIV("/"), MOD("%");
 
         String textRepresentation;
 

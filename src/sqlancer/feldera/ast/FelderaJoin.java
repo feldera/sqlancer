@@ -2,11 +2,7 @@ package sqlancer.feldera.ast;
 
 import sqlancer.Randomly;
 import sqlancer.common.ast.newast.Join;
-import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.FelderaSchema;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class FelderaJoin
         implements FelderaExpression, Join<FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn> {
@@ -46,12 +42,6 @@ public class FelderaJoin
 
     public FelderaExpression getOnCondition() {
         return onCondition;
-    }
-
-    public static List<FelderaJoin> getJoins(List<FelderaTableReference> tableList, FelderaGlobalState globalState) {
-        List<FelderaJoin> joinExpressions = new ArrayList<>();
-        // TODO
-        return joinExpressions;
     }
 
     @Override

@@ -16,7 +16,7 @@ public class FelderaCast implements FelderaExpression {
     }
 
     public String getStringRepresentation() {
-        return "::" + type.toString();
+        return " AS " + type.toString();
     }
 
 }

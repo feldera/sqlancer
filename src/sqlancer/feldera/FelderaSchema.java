@@ -3,6 +3,7 @@ package sqlancer.feldera;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
@@ -66,7 +67,7 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     }
 
     public static FelderaSchema fromConnection(FelderaConnection con) throws Exception {
-        return new FelderaSchema(new ArrayList<>(), con.getClient().pipelineName());
+        return new FelderaSchema(new ArrayList<>(), con.getPipelineName());
     }
 
     protected List<FelderaColumn> getTableColumns(String tableName) throws Exception {
@@ -137,7 +138,7 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
 
         public FelderaFieldColumn(String name, FelderaDataType columnType, boolean isNullable) {
             super(name, columnType, isNullable);
-            // later, you can assert that the Field column isn't something like INTERVAL
+            // Note to self: later, assert that the Field column isn't something like INTERVAL
         }
     }
 
@@ -186,6 +187,16 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         public long getNrRows(FelderaGlobalState globalState) {
             // TODO
             return 0;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof FelderaTable) {
+                FelderaTable other = (FelderaTable) obj;
+                return Objects.equals(this.name, other.name) && this.getColumns() == other.getColumns();
+            } else {
+                return false;
+            }
         }
 
         public static List<FelderaColumn> getAllColumns(List<FelderaTable> tables) {

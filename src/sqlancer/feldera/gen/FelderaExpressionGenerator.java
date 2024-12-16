@@ -8,9 +8,7 @@ import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.FelderaSchema;
 import sqlancer.feldera.ast.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public final class FelderaExpressionGenerator
@@ -66,14 +64,20 @@ public final class FelderaExpressionGenerator
     }
 
     private FelderaExpression generateStringExpression(int depth) {
-        // TODO
+        FelderaSchema.FelderaDataType type = FelderaSchema.FelderaDataType.VARCHAR;
+        List<FelderaFunction> applicableFunctions = FelderaFunction.getFunctionCompatibleWith(type);
+        if (!applicableFunctions.isEmpty()) {
+            FelderaFunction function = Randomly.fromList(applicableFunctions);
+            return function.getCall(type, this, depth + 1);
+        }
+
         return generateLeafNode(FelderaSchema.FelderaDataType.VARCHAR);
     }
 
     private FelderaExpression generateIntegerString() {
         String s = Randomly.StringGenerationStrategy.NUMERIC.getString(globalState.getRandomly());
         if (s.isBlank()) {
-            s = "0";
+            s = "1";
         }
         return new FelderaConstant.FelderaVarcharConstant(s);
     }
@@ -144,7 +148,7 @@ public final class FelderaExpressionGenerator
                 return function.getCall(type, this, depth + 1);
             }
         }
-        if (type.isNumeric() || Randomly.getBooleanWithSmallProbability()) {
+        if (type.isNumeric() && Randomly.getBooleanWithSmallProbability()) {
             FelderaSchema.FelderaDataType randomType = FelderaSchema.FelderaDataType.getRandomType();
             FelderaExpression expr;
             if (randomType == FelderaSchema.FelderaDataType.VARCHAR) {
@@ -173,7 +177,8 @@ public final class FelderaExpressionGenerator
         case TIMESTAMP:
         case TIME:
         case CHAR:
-            return FelderaConstant.getRandomConstant(globalState, type);
+            FelderaExpression expr = FelderaConstant.getRandomConstant(globalState, type);
+            return new FelderaCast(expr, type);
         default:
             throw new AssertionError(type);
         }
@@ -211,12 +216,12 @@ public final class FelderaExpressionGenerator
 
     @Override
     public FelderaExpression negatePredicate(FelderaExpression predicate) {
-        return null;
+        return new FelderaUnaryPrefixOperation(predicate, FelderaUnaryPrefixOperation.FelderaUnaryPrefixOperator.NOT);
     }
 
     @Override
     public FelderaExpression isNull(FelderaExpression expr) {
-        return null;
+        return new FelderaUnaryPostfixOperation(expr, FelderaUnaryPostfixOperation.FelderaUnaryPostfixOperator.IS_NULL);
     }
 
     @Override
@@ -252,15 +257,62 @@ public final class FelderaExpressionGenerator
         }
 
         select.setFetchColumns(columns);
-        select.setJoinClauses(getRandomJoinClauses());
-        select.setFromList(getTableRefs());
+        List<FelderaJoin> randomJoins = getRandomJoinClauses();
+        List<FelderaTableReference> joinedTables = new ArrayList<>();
+
+        for (FelderaJoin join : randomJoins) {
+            joinedTables.add(join.getLeftTable());
+            joinedTables.add(join.getRightTable());
+        }
+
+        select.setJoinClauses(randomJoins);
+
+        List<FelderaExpression> fromList = getTableRefs().stream()
+                .filter(t -> !joinedTables.contains((FelderaTableReference) t)).collect(Collectors.toList());
+        select.setFromList(fromList);
 
         return select;
     }
 
     @Override
     public List<FelderaJoin> getRandomJoinClauses() {
-        return new ArrayList<>();
+        return getRandomJoinClauses(new ArrayList<>(tables));
+    }
+
+    public List<FelderaJoin> getRandomJoinClauses(List<FelderaSchema.FelderaTable> tables) {
+        List<FelderaTableReference> tablesRef = tables.stream().map(FelderaTableReference::new)
+                .collect(Collectors.toList());
+        List<FelderaJoin> joinStatements = new ArrayList<>();
+        List<FelderaJoin.FelderaJoinType> options = new ArrayList<>(
+                Arrays.asList(FelderaJoin.FelderaJoinType.values()));
+
+        if (tablesRef.size() >= 2) {
+            int nrJoinClauses = (int) Randomly.getNotCachedInteger(0, (tables.size() / 2) - 1);
+            // natural join is incompatible with other joins
+            // because it needs unique column names
+            // while other joins will produce duplicate column names
+            if (nrJoinClauses > 1) {
+                options.remove(FelderaJoin.FelderaJoinType.NATURAL);
+            }
+            for (int i = 0; i < nrJoinClauses; i++) {
+                FelderaExpression joinClause = generatePredicate();
+                FelderaTableReference leftTable = Randomly.fromList(tablesRef);
+                tablesRef.remove(leftTable);
+                FelderaTableReference rightTable = Randomly.fromList(tablesRef);
+                tablesRef.remove(rightTable);
+
+                FelderaJoin.FelderaJoinType selectedOption = Randomly.fromList(options);
+                if (selectedOption == FelderaJoin.FelderaJoinType.NATURAL) {
+                    // NATURAL joins do not have an ON clause
+                    joinClause = null;
+                }
+
+                FelderaJoin j = new FelderaJoin(leftTable, rightTable, selectedOption, joinClause);
+                joinStatements.add(j);
+            }
+        }
+
+        return joinStatements;
     }
 
     @Override

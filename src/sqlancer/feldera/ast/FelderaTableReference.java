@@ -9,4 +9,13 @@ public class FelderaTableReference extends TableReferenceNode<FelderaExpression,
         super(table);
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof FelderaTableReference)) {
+            return false;
+        }
+
+        FelderaTableReference other = (FelderaTableReference) obj;
+        return this.getTable().equals(other.getTable());
+    }
 }

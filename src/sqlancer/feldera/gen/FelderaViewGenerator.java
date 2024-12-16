@@ -12,34 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FelderaViewGenerator {
-    private static int counter = 0;
-
     public FelderaViewGenerator() {
     }
 
-    private static String createViewName(int n) {
-        return "v" + n;
-    }
-
-    public static List<FelderaOtherQuery> generate(FelderaGlobalState globalState) {
+    public static List<FelderaOtherQuery> generate(FelderaGlobalState globalState, String viewName) {
         List<FelderaOtherQuery> queries = new ArrayList<>();
         FelderaExpressionGenerator gen = new FelderaExpressionGenerator(globalState)
                 .setTablesAndColumns(TestOracleUtils.getRandomTableNonEmptyTables(globalState.getSchema()));
         FelderaSelect select = gen.generateSelect();
         FelderaExpression whereCondition = gen.generateBooleanExpression();
 
-        queries.add(generateViewFromSelect(select, gen, whereCondition, counter, true));
-        queries.add(generateViewFromSelect(select, gen, whereCondition, counter, false));
-        globalState.addView(createViewName(counter++));
+        queries.add(generateViewFromSelect(select, gen, whereCondition, viewName, true));
+        queries.add(generateViewFromSelect(select, gen, whereCondition, viewName, false));
         return queries;
     }
 
     private static FelderaOtherQuery generateViewFromSelect(FelderaSelect select, FelderaExpressionGenerator gen,
-            FelderaExpression whereCondition, int viewNumber, boolean optimized) {
+            FelderaExpression whereCondition, String viewName, boolean optimized) {
         ExpectedErrors errors = new ExpectedErrors();
         StringBuilder sb = new StringBuilder("CREATE MATERIALIZED VIEW ");
-        String name = createViewName(viewNumber);
-        sb.append(name);
+        sb.append(viewName);
         if (optimized) {
             sb.append("_optimized");
         }

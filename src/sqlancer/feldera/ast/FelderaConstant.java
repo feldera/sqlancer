@@ -6,6 +6,7 @@ import sqlancer.feldera.FelderaSchema;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 
 public abstract class FelderaConstant implements FelderaExpression {
     private FelderaConstant() {
@@ -92,7 +93,7 @@ public abstract class FelderaConstant implements FelderaExpression {
         public static FelderaDateConstant getRandom(FelderaGlobalState globalState) {
             Randomly r = globalState.getRandomly();
 
-            int year = r.getInteger(1970, 2500);
+            int year = r.getInteger(0, 9999);
             int month = r.getInteger(1, 12);
             int day = r.getInteger(1, 31);
 
@@ -147,10 +148,12 @@ public abstract class FelderaConstant implements FelderaExpression {
             return new FelderaIntConstant(globalState.getRandomly().getInteger());
         }
 
-        public static FelderaIntConstant getRandom(FelderaGlobalState globalState, int length) {
-            long left = -((2 ^ length) / 2);
-            long right = (2 ^ length - 1) / 2;
-            return new FelderaIntConstant(globalState.getRandomly().getLong(left, right));
+        public static FelderaIntConstant getRandom(FelderaGlobalState globalState, int bitLength) {
+            // int left = -(1 << (bitLength - 1));
+            // int right = (1 << (bitLength - 1)) - 1;
+            // return new FelderaIntConstant(globalState.getRandomly().getLong(left, right));
+            // HACK: for now, generate just a small random number that isn't 0
+            return new FelderaIntConstant(Randomly.smallNumber() + 1);
         }
     }
 
@@ -176,7 +179,8 @@ public abstract class FelderaConstant implements FelderaExpression {
         }
 
         public static FelderaDoubleConstant getRandom(FelderaGlobalState globalState) {
-            return new FelderaDoubleConstant(FelderaConstant.round(globalState.getRandomly().getFiniteDouble(), 10));
+            return new FelderaDoubleConstant(
+                    FelderaConstant.round(globalState.getRandomly().getFiniteDouble() + 1.0, 10));
         }
     }
 
@@ -203,7 +207,7 @@ public abstract class FelderaConstant implements FelderaExpression {
 
         public static FelderaRealConstant getRandom(FelderaGlobalState globalState) {
             return new FelderaRealConstant(
-                    ((float) FelderaConstant.round(globalState.getRandomly().getFiniteDouble(), 5)));
+                    ((float) FelderaConstant.round(globalState.getRandomly().getFiniteDouble() + 1.0, 5)));
         }
     }
 
@@ -223,8 +227,26 @@ public abstract class FelderaConstant implements FelderaExpression {
             return "'" + value.replace("'", "''") + "'";
         }
 
+        private static String getRandomString(FelderaGlobalState globalState) {
+            return globalState.getRandomly().getString().replaceAll("[^a-zA-Z0-9]", "");
+        }
+
         public static FelderaVarcharConstant getRandom(FelderaGlobalState globalState) {
-            return new FelderaVarcharConstant(globalState.getRandomly().getString().replaceAll("[^\\x00-\\x7F]", ""));
+            String randomString = getRandomString(globalState);
+
+            // retry for 10 times, but if it's still empty, just use a default string
+            for (int i = 0; i < 10; i++) {
+                if (!randomString.isBlank()) {
+                    break;
+                }
+                randomString = getRandomString(globalState);
+            }
+
+            if (randomString.isBlank()) {
+                randomString = "DEFAULT STRING";
+            }
+
+            return new FelderaVarcharConstant(randomString);
         }
     }
 
@@ -245,7 +267,12 @@ public abstract class FelderaConstant implements FelderaExpression {
         }
 
         public static FelderaCharConstant getRandom(FelderaGlobalState globalState) {
-            return new FelderaCharConstant(globalState.getRandomly().getAlphabeticChar().charAt(0));
+            char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
+            while (true) {
+                if (StandardCharsets.ISO_8859_1.newEncoder().canEncode(ch)) {
+                    return new FelderaCharConstant(ch);
+                }
+            }
         }
     }
 

@@ -19,7 +19,7 @@ public class FelderaOtherQuery extends FelderaQueryAdapter {
     public <G extends GlobalState<?, ?, FelderaConnection>> boolean execute(G globalState, String... fills)
             throws Exception {
         try {
-            globalState.getConnection().getClient().buffer(query);
+            globalState.getConnection().buffer(query);
         } catch (Exception e) {
             if (this.errors.errorIsExpected(e.getMessage())) {
                 throw new IgnoreMeException();
