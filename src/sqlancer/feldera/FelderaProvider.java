@@ -47,8 +47,8 @@ public class FelderaProvider extends ProviderAdapter<FelderaGlobalState, Feldera
 
     @Override
     public void generateDatabase(FelderaGlobalState globalState) throws Exception {
-        createTables(globalState, Randomly.fromOptions(4, 5, 6));
-        createViews(globalState, Randomly.fromOptions(4, 5, 6));
+        createTables(globalState, Randomly.fromOptions(8, 10, 12));
+        createViews(globalState, Randomly.fromOptions(8, 10, 12));
         prepareTables(globalState);
     }
 

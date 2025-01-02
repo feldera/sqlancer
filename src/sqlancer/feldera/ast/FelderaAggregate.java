@@ -13,13 +13,14 @@ public class FelderaAggregate implements FelderaExpression {
     private boolean blackbox;
 
     public enum FelderaAggregateFunction {
-        AVG(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.DOUBLE),
+        AVG(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
         COUNT(FelderaSchema.FelderaDataType.values()), EVERY(FelderaSchema.FelderaDataType.BOOLEAN),
         MAX(FelderaSchema.FelderaDataType.values()), MIN(FelderaSchema.FelderaDataType.values()),
         SOME(FelderaSchema.FelderaDataType.BOOLEAN),
-        SUM(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.DOUBLE),
-        STDDEV(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.DOUBLE),
-        STDDEV_POP(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.DOUBLE),;
+        SUM(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
+        STDDEV(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
+        STDDEV_POP(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
+        COUNTIF(FelderaSchema.FelderaDataType.BOOLEAN);
 
         private final FelderaSchema.FelderaDataType[] supportedReturnTypes;
 
@@ -27,16 +28,17 @@ public class FelderaAggregate implements FelderaExpression {
             this.supportedReturnTypes = supportedReturnTypes.clone();
         }
 
-        public List<FelderaSchema.FelderaDataType> getTypes(FelderaSchema.FelderaDataType returnType) {
+        public List<FelderaSchema.FelderaCompositeDataType> getTypes(
+                FelderaSchema.FelderaCompositeDataType returnType) {
             return Collections.singletonList(returnType);
         }
 
-        public boolean supportsReturnType(FelderaSchema.FelderaDataType returnType) {
-            return Arrays.stream(supportedReturnTypes).anyMatch(t -> t == returnType)
+        public boolean supportsReturnType(FelderaSchema.FelderaCompositeDataType returnType) {
+            return Arrays.stream(supportedReturnTypes).anyMatch(t -> t == returnType.getPrimitiveType())
                     || supportedReturnTypes.length == 0;
         }
 
-        public static List<FelderaAggregateFunction> getAggregates(FelderaSchema.FelderaDataType type) {
+        public static List<FelderaAggregateFunction> getAggregates(FelderaSchema.FelderaCompositeDataType type) {
             return Arrays.stream(values()).filter(p -> p.supportsReturnType(type)).collect(Collectors.toList());
         }
     }

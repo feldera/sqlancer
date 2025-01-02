@@ -3,10 +3,14 @@ package sqlancer.feldera.ast;
 import sqlancer.Randomly;
 import sqlancer.feldera.FelderaGlobalState;
 import sqlancer.feldera.FelderaSchema;
+import sqlancer.feldera.FelderaToStringVisitor;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class FelderaConstant implements FelderaExpression {
     private FelderaConstant() {
@@ -18,37 +22,97 @@ public abstract class FelderaConstant implements FelderaExpression {
         return decimal.doubleValue();
     }
 
-    public static FelderaConstant getRandomConstant(FelderaGlobalState globalState,
-            FelderaSchema.FelderaDataType type) {
-        switch (type) {
+    public static FelderaExpression getRandomConstant(FelderaGlobalState globalState,
+            FelderaSchema.FelderaCompositeDataType type) {
+        switch (type.getPrimitiveType()) {
         case BOOLEAN:
             return new FelderaBooleanConstant(Randomly.getBoolean());
-        case TINYINT:
-            return FelderaIntConstant.getRandom(globalState, 8);
-        case SMALLINT:
-            return FelderaIntConstant.getRandom(globalState, 16);
         case INT:
-            return FelderaIntConstant.getRandom(globalState, 32);
-        case BIGINT:
-            return FelderaIntConstant.getRandom(globalState, 64);
+            return FelderaIntConstant.getRandom(globalState, type.getSize());
         case VARCHAR:
-            return FelderaVarcharConstant.getRandom(globalState);
+            return FelderaVarcharConstant.getRandom(globalState, type.getSize());
         case CHAR:
-            return FelderaCharConstant.getRandom(globalState);
+            return FelderaCharConstant.getRandom(globalState, type.getSize());
         case NULL:
             return new FelderaNullConstant();
         case TIME:
-            return FelderaTimeConstant.getRandom(globalState);
+            return new FelderaCast(FelderaTimeConstant.getRandom(globalState), type);
         case DATE:
-            return FelderaDateConstant.getRandom(globalState);
+            return new FelderaCast(FelderaDateConstant.getRandom(globalState), type);
         case TIMESTAMP:
-            return FelderaTimestampConstant.getRandom(globalState);
-        case REAL:
-            return FelderaRealConstant.getRandom(globalState);
-        case DOUBLE:
-            return FelderaDoubleConstant.getRandom(globalState);
+            return new FelderaCast(FelderaTimestampConstant.getRandom(globalState), type);
+        case FLOAT:
+            return FelderaFloatConstant.getRandom(globalState, type.getSize());
+        case DECIMAL:
+            return FelderaDecimalConstant.getRandom(globalState, type.getSize(), type.getScale());
+        case ARRAY:
+            return FelderaArrayConstant.getRandom(globalState, type.getElementType());
         default:
             throw new AssertionError(type);
+        }
+    }
+
+    public static class FelderaArrayConstant extends FelderaConstant {
+        private final List<String> array;
+
+        public FelderaArrayConstant(List<String> array) {
+            this.array = array;
+        }
+
+        public List<String> getValue() {
+            return array;
+        }
+
+        public static FelderaArrayConstant getRandom(FelderaGlobalState globalState,
+                FelderaSchema.FelderaCompositeDataType type) {
+            int size = Randomly.fromOptions(1, 2, 3);
+            List<String> array = new ArrayList<>(size);
+
+            for (int i = 0; i < size; i++) {
+                FelderaExpression expr = getRandomConstant(globalState, type);
+                array.add(FelderaToStringVisitor.asString(expr));
+            }
+
+            return new FelderaArrayConstant(array);
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder("array[");
+            for (int i = 0; i < array.size(); i++) {
+                if (i != 0) {
+                    sb.append(", ");
+                }
+                sb.append(array.get(i));
+            }
+
+            sb.append("]");
+            return sb.toString();
+        }
+    }
+
+    public static class FelderaDecimalConstant extends FelderaConstant {
+        private final BigDecimal value;
+
+        public FelderaDecimalConstant(BigDecimal value) {
+            this.value = value;
+        }
+
+        public BigDecimal getValue() {
+            return this.value;
+        }
+
+        public static FelderaDecimalConstant getRandom(FelderaGlobalState globalState, int size, int scale) {
+            // unsure what to do about size for now
+            BigDecimal value = globalState.getRandomly().getRandomBigDecimal().setScale(scale, RoundingMode.HALF_UP)
+                    .add(BigDecimal.ONE);
+
+            return new FelderaDecimalConstant(value);
+        }
+
+        @Override
+        public String toString() {
+            return value.toPlainString();
         }
     }
 
@@ -157,10 +221,10 @@ public abstract class FelderaConstant implements FelderaExpression {
         }
     }
 
-    public static class FelderaDoubleConstant extends FelderaConstant {
+    public static class FelderaFloatConstant extends FelderaConstant {
         private final double value;
 
-        public FelderaDoubleConstant(double value) {
+        public FelderaFloatConstant(double value) {
             this.value = value;
         }
 
@@ -178,36 +242,16 @@ public abstract class FelderaConstant implements FelderaExpression {
             return String.valueOf(value);
         }
 
-        public static FelderaDoubleConstant getRandom(FelderaGlobalState globalState) {
-            return new FelderaDoubleConstant(
-                    FelderaConstant.round(globalState.getRandomly().getFiniteDouble() + 1.0, 10));
-        }
-    }
-
-    public static class FelderaRealConstant extends FelderaConstant {
-        private final float value;
-
-        public FelderaRealConstant(float value) {
-            this.value = value;
-        }
-
-        public float getValue() {
-            return value;
-        }
-
-        @Override
-        public String toString() {
-            if (value == Float.POSITIVE_INFINITY) {
-                return "'+Inf'";
-            } else if (value == Float.NEGATIVE_INFINITY) {
-                return "'-Inf'";
+        public static FelderaFloatConstant getRandom(FelderaGlobalState globalState, int size) {
+            double value = globalState.getRandomly().getFiniteDouble() + 1.0;
+            switch (size) {
+            case 32:
+                return new FelderaFloatConstant(FelderaConstant.round(value, 5));
+            case 64:
+                return new FelderaFloatConstant(FelderaConstant.round(value, 10));
+            default:
+                throw new AssertionError(size);
             }
-            return String.valueOf(value);
-        }
-
-        public static FelderaRealConstant getRandom(FelderaGlobalState globalState) {
-            return new FelderaRealConstant(
-                    ((float) FelderaConstant.round(globalState.getRandomly().getFiniteDouble() + 1.0, 5)));
         }
     }
 
@@ -248,16 +292,33 @@ public abstract class FelderaConstant implements FelderaExpression {
 
             return new FelderaVarcharConstant(randomString);
         }
+
+        public static FelderaVarcharConstant getRandom(FelderaGlobalState globalState, int size) {
+            if (size < 0) {
+                return FelderaVarcharConstant.getRandom(globalState);
+            }
+
+            StringBuilder sb = new StringBuilder();
+            CharsetEncoder encoder = StandardCharsets.ISO_8859_1.newEncoder();
+            while (sb.length() < size) {
+                char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
+                if (encoder.canEncode(ch)) {
+                    sb.append(ch);
+                }
+            }
+
+            return new FelderaVarcharConstant(sb.toString());
+        }
     }
 
     public static class FelderaCharConstant extends FelderaConstant {
-        private final char value;
+        private final String value;
 
-        public FelderaCharConstant(char value) {
+        public FelderaCharConstant(String value) {
             this.value = value;
         }
 
-        public char getValue() {
+        public String getValue() {
             return value;
         }
 
@@ -266,13 +327,21 @@ public abstract class FelderaConstant implements FelderaExpression {
             return "'" + this.value + "'";
         }
 
-        public static FelderaCharConstant getRandom(FelderaGlobalState globalState) {
-            char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
-            while (true) {
-                if (StandardCharsets.ISO_8859_1.newEncoder().canEncode(ch)) {
-                    return new FelderaCharConstant(ch);
+        public static FelderaCharConstant getRandom(FelderaGlobalState globalState, int length) {
+            StringBuilder sb = new StringBuilder();
+            CharsetEncoder encoder = StandardCharsets.ISO_8859_1.newEncoder();
+
+            for (int i = 0; i < length; i++) {
+                char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
+                while (true) {
+                    if (encoder.canEncode(ch)) {
+                        sb.append(ch);
+                        break;
+                    }
                 }
             }
+
+            return new FelderaCharConstant(sb.toString());
         }
     }
 
@@ -301,8 +370,8 @@ public abstract class FelderaConstant implements FelderaExpression {
         return new FelderaVarcharConstant(text);
     }
 
-    public static FelderaExpression createDoubleConstant(double val) {
-        return new FelderaDoubleConstant(val);
+    public static FelderaExpression createFloatConstant(double val) {
+        return new FelderaFloatConstant(val);
     }
 
     public static FelderaExpression createIntConstant(long val) {
