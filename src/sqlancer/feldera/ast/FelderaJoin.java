@@ -13,7 +13,9 @@ public class FelderaJoin
     private FelderaExpression onCondition;
 
     public enum FelderaJoinType {
-        INNER, NATURAL, LEFT, RIGHT;
+        INNER,
+       // NATURAL,
+        LEFT, RIGHT;
 
         public static FelderaJoinType getRandom() {
             return Randomly.fromOptions(values());

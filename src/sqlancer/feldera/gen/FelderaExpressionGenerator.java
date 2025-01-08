@@ -54,6 +54,9 @@ public final class FelderaExpressionGenerator extends
                             FelderaUnaryPostfixOperation.FelderaUnaryPostfixOperator.IS_NOT_NULL));
         case BETWEEN:
             FelderaSchema.FelderaCompositeDataType type = getRandomType();
+            if (type.isArray()) {
+                type = FelderaSchema.FelderaCompositeDataType.getBooleanType();
+            }
             expr = generateExpression(type, depth + 1);
             FelderaExpression left = generateExpression(type, depth + 1);
             FelderaExpression right = generateExpression(type, depth + 1);
@@ -127,7 +130,20 @@ public final class FelderaExpressionGenerator extends
         }
 
         return new FelderaAggregate(agg, args);
+    }
 
+    private FelderaExpression generateArrayExpression(FelderaSchema.FelderaCompositeDataType type, int depth) {
+        if (depth >= maxDepth) {
+            return generateLeafNode(type);
+        }
+
+        List<FelderaFunction> applicableFunctions = FelderaFunction.getFunctionCompatibleWith(type);
+        if (!applicableFunctions.isEmpty()) {
+            FelderaFunction function = Randomly.fromList(applicableFunctions);
+            return function.getCall(type, this, depth + 1);
+        }
+
+        return generateLeafNode(type);
     }
 
     @Override
@@ -164,6 +180,7 @@ public final class FelderaExpressionGenerator extends
 
         switch (type.getPrimitiveType()) {
         case ARRAY:
+            return generateArrayExpression(type, depth + 1);
         case DATE:
         case TIMESTAMP:
         case TIME:
@@ -290,9 +307,9 @@ public final class FelderaExpressionGenerator extends
             // natural join is incompatible with other joins
             // because it needs unique column names
             // while other joins will produce duplicate column names
-            if (nrJoinClauses > 1) {
-                options.remove(FelderaJoin.FelderaJoinType.NATURAL);
-            }
+//            if (nrJoinClauses > 1) {
+//                options.remove(FelderaJoin.FelderaJoinType.NATURAL);
+//            }
             for (int i = 0; i < nrJoinClauses; i++) {
                 FelderaExpression joinClause = generatePredicate();
                 FelderaTableReference leftTable = Randomly.fromList(tablesRef);
@@ -301,10 +318,10 @@ public final class FelderaExpressionGenerator extends
                 tablesRef.remove(rightTable);
 
                 FelderaJoin.FelderaJoinType selectedOption = Randomly.fromList(options);
-                if (selectedOption == FelderaJoin.FelderaJoinType.NATURAL) {
-                    // NATURAL joins do not have an ON clause
-                    joinClause = null;
-                }
+//                if (selectedOption == FelderaJoin.FelderaJoinType.NATURAL) {
+//                    // NATURAL joins do not have an ON clause
+//                    joinClause = null;
+//                }
 
                 FelderaJoin j = new FelderaJoin(leftTable, rightTable, selectedOption, joinClause);
                 joinStatements.add(j);

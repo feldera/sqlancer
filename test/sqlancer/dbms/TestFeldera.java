@@ -10,9 +10,9 @@ public class TestFeldera {
     @Test
     public void testFelderaNoREC() {
         assumeTrue(TestConfig.isEnvironmentTrue(TestConfig.FELDERA_ENV));
-        assertEquals(0,
-                Main.executeMain(
-                         "--timeout-seconds", TestConfig.SECONDS, "feldera",
-                        "--oracle", "NOREC"));
+        assertEquals(0, Main.executeMain("--num-threads", "16",
+                "--timeout-seconds", TestConfig.SECONDS,
+                "feldera",
+                "--oracle", "NOREC"));
     }
 }

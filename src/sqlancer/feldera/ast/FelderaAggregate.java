@@ -14,8 +14,8 @@ public class FelderaAggregate implements FelderaExpression {
 
     public enum FelderaAggregateFunction {
         AVG(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
-        COUNT(FelderaSchema.FelderaDataType.values()), EVERY(FelderaSchema.FelderaDataType.BOOLEAN),
-        MAX(FelderaSchema.FelderaDataType.values()), MIN(FelderaSchema.FelderaDataType.values()),
+        COUNT(FelderaSchema.FelderaDataType.nonNullValues()), EVERY(FelderaSchema.FelderaDataType.BOOLEAN),
+        MAX(FelderaSchema.FelderaDataType.nonNullValues()), MIN(FelderaSchema.FelderaDataType.nonNullValues()),
         SOME(FelderaSchema.FelderaDataType.BOOLEAN),
         SUM(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),
         STDDEV(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.FLOAT),

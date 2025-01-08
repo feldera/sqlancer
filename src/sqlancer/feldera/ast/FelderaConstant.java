@@ -332,13 +332,14 @@ public abstract class FelderaConstant implements FelderaExpression {
             CharsetEncoder encoder = StandardCharsets.ISO_8859_1.newEncoder();
 
             for (int i = 0; i < length; i++) {
-                char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
-                while (true) {
+                for (int attempts = 0; attempts < 10; attempts++) {
+                    char ch = globalState.getRandomly().getAlphabeticChar().charAt(0);
                     if (encoder.canEncode(ch)) {
                         sb.append(ch);
                         break;
                     }
                 }
+                sb.append("x");
             }
 
             return new FelderaCharConstant(sb.toString());

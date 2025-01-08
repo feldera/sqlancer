@@ -3,7 +3,6 @@ package sqlancer.feldera;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.yugabyte.jdbc.EscapeSyntaxCallMode;
 import sqlancer.Randomly;
 import sqlancer.common.schema.*;
 import sqlancer.feldera.ast.FelderaColumnReference;
@@ -48,7 +47,7 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     }
 
     public enum FelderaDataType {
-        BOOLEAN, INT, VARCHAR, CHAR, NULL, TIME, DATE, TIMESTAMP, DECIMAL, FLOAT,
+        BOOLEAN, INT, VARCHAR, CHAR, NULL, TIME, DATE, TIMESTAMP, DECIMAL, FLOAT, ANY,
         // VARIANT,
         // VARBINARY,
         // INTERVAL,
@@ -74,8 +73,13 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         }
 
         public static FelderaDataType getRandomNonNullType() {
-            return Randomly.fromList(
-                    Arrays.stream(values()).filter(t -> t != FelderaDataType.NULL).collect(Collectors.toList()));
+            return Randomly.fromList(Arrays.stream(values())
+                    .filter(t -> t != FelderaDataType.NULL && t != FelderaDataType.ANY).collect(Collectors.toList()));
+        }
+
+        public static FelderaDataType[] nonNullValues() {
+            return Arrays.stream(values()).filter(t -> t != FelderaDataType.NULL && t != FelderaDataType.ANY)
+                    .toArray(FelderaDataType[]::new);
         }
 
         public static FelderaDataType getRandomType() {
@@ -94,6 +98,10 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
             this.size = size;
             this.scale = scale;
             this.elementType = null;
+        }
+
+        public static FelderaCompositeDataType arrayOf(FelderaDataType elementType) {
+            return new FelderaCompositeDataType(FelderaDataType.ARRAY, getRandomFromPrimitiveType(elementType));
         }
 
         public FelderaCompositeDataType(FelderaDataType dataType, FelderaCompositeDataType elementType) {

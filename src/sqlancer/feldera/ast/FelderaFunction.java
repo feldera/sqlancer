@@ -4,6 +4,7 @@ import sqlancer.feldera.FelderaSchema;
 import sqlancer.feldera.gen.FelderaExpressionGenerator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -119,7 +120,42 @@ public enum FelderaFunction {
 
     // Int
     ABS_INT("ABS", FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.INT),
-    MOD(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.INT),;
+    MOD(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.INT),
+
+    // ARRAY
+    ARRAY(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ANY),
+    ARRAY_APPEND(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ANY),
+    ARRAY_CONCAT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_COMPACT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_CONTAINS(FelderaSchema.FelderaDataType.BOOLEAN, FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ANY),
+    ARRAY_DISTINCT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_EXCEPT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_INTERSECT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_SIZE(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_LENGTH(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_MAX(FelderaSchema.FelderaDataType.ANY, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_MIN(FelderaSchema.FelderaDataType.ANY, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAYS_OVERLAP(FelderaSchema.FelderaDataType.BOOLEAN, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_POSITION(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ANY),
+    ARRAY_PREPEND(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ANY),
+    ARRAY_REMOVE(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ANY),
+    ARRAY_REVERSE(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY),
+    ARRAY_REPEAT(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ANY,
+            FelderaSchema.FelderaDataType.INT),
+    ARRAY_TO_STRING(FelderaSchema.FelderaDataType.VARCHAR, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.CHAR),
+    ARRAY_UNION(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY,
+            FelderaSchema.FelderaDataType.ARRAY),
+    CARDINALITY(FelderaSchema.FelderaDataType.INT, FelderaSchema.FelderaDataType.ARRAY),
+    SORT_ARRAY(FelderaSchema.FelderaDataType.ARRAY, FelderaSchema.FelderaDataType.ARRAY),;
 
     private FelderaSchema.FelderaDataType returnType;
     private FelderaSchema.FelderaDataType[] argumentTypes;
@@ -156,20 +192,42 @@ public enum FelderaFunction {
         return argumentTypes;
     }
 
-    public FelderaFunctionCall getCall(FelderaSchema.FelderaCompositeDataType returnType,
-            FelderaExpressionGenerator gen, int depth) {
+    public FelderaFunctionCall getCall(FelderaSchema.FelderaCompositeDataType type, FelderaExpressionGenerator gen,
+            int depth) {
         FelderaSchema.FelderaDataType[] argumentTypes = getArgumentTypes();
-        List<FelderaExpression> arguments = getArgumentsForReturnType(gen, depth, argumentTypes, returnType);
+        List<FelderaExpression> arguments = getArgumentsForReturnType(gen, depth, argumentTypes, type);
         return new FelderaFunctionCall(this, arguments);
     }
 
     List<FelderaExpression> getArgumentsForReturnType(FelderaExpressionGenerator gen, int depth,
-            FelderaSchema.FelderaDataType[] argumentTypes, FelderaSchema.FelderaCompositeDataType returnType) {
+            FelderaSchema.FelderaDataType[] argumentTypes, FelderaSchema.FelderaCompositeDataType type) {
         List<FelderaExpression> arguments = new ArrayList<>();
+        FelderaSchema.FelderaCompositeDataType arrayType;
+        FelderaSchema.FelderaCompositeDataType arrayElementType;
+        if (type.isArray()) {
+            arrayElementType = type.getElementType();
+        } else {
+            arrayElementType = FelderaSchema.FelderaCompositeDataType.getRandomWithoutNull();
+        }
+
+        if (this.returnType == FelderaSchema.FelderaDataType.ARRAY) {
+            arrayType = type;
+        } else {
+            arrayType = new FelderaSchema.FelderaCompositeDataType(FelderaSchema.FelderaDataType.ARRAY, arrayElementType);
+        }
 
         for (FelderaSchema.FelderaDataType arg : argumentTypes) {
-            arguments.add(gen.generateExpression(FelderaSchema.FelderaCompositeDataType.getRandomFromPrimitiveType(arg),
-                    depth + 1));
+            switch (arg) {
+                case ARRAY:
+                    arguments.add(gen.generateConstant(arrayType));
+                    continue;
+                case ANY:
+                    arguments.add(gen.generateConstant(arrayElementType));
+                    continue;
+                default:
+                    arguments.add(gen.generateExpression(FelderaSchema.FelderaCompositeDataType.getRandomFromPrimitiveType(arg),
+                            depth + 1));
+            }
         }
 
         return arguments;
