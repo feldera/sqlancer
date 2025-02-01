@@ -1,9 +1,6 @@
 package sqlancer.feldera;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import sqlancer.Randomly;
@@ -33,39 +30,6 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         return new FelderaSchema(tables, this.pipelineName);
     }
 
-    public static FelderaDataType getColumnType(String typeString) {
-        switch (typeString.toUpperCase()) {
-        case "BOOLEAN":
-            return FelderaDataType.BOOLEAN;
-        case "TINYINT":
-            return FelderaDataType.TINYINT;
-        case "SMALLINT":
-            return FelderaDataType.SMALLINT;
-        case "INT":
-            return FelderaDataType.INT;
-        case "BIGINT":
-            return FelderaDataType.BIGINT;
-        case "VARCHAR":
-            return FelderaDataType.VARCHAR;
-        case "CHAR":
-            return FelderaDataType.CHAR;
-        case "NULL":
-            return FelderaDataType.NULL;
-        case "TIME":
-            return FelderaDataType.TIME;
-        case "DATE":
-            return FelderaDataType.DATE;
-        case "TIMESTAMP":
-            return FelderaDataType.TIMESTAMP;
-        case "REAL":
-            return FelderaDataType.REAL;
-        case "DOUBLE":
-            return FelderaDataType.DOUBLE;
-        default:
-            throw new AssertionError(typeString);
-        }
-    }
-
     public static FelderaSchema fromConnection(FelderaConnection con) throws Exception {
         return new FelderaSchema(new ArrayList<>(), con.getPipelineName());
     }
@@ -83,16 +47,14 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
     }
 
     public enum FelderaDataType {
-        BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, VARCHAR, CHAR, NULL, TIME, DATE, TIMESTAMP,
-        // DECIMAL,
+        BOOLEAN, INT, VARCHAR, CHAR, NULL, TIME, DATE, TIMESTAMP, DECIMAL, FLOAT, ANY,
+        // VARIANT,
         // VARBINARY,
         // INTERVAL,
         // GEOMETRY,
         // ROW,
-        // ARRAY,
         // MAP,
-        // VARIANT,
-        REAL, DOUBLE;
+        ARRAY;
 
         public static FelderaDataType getRandomNumericType() {
             return Randomly
@@ -101,12 +63,9 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
 
         public boolean isNumeric() {
             switch (this) {
-            case REAL:
-            case DOUBLE:
-            case TINYINT:
-            case SMALLINT:
+            case FLOAT:
             case INT:
-            case BIGINT:
+            case DECIMAL:
                 return true;
             default:
                 return false;
@@ -114,12 +73,46 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         }
 
         public static FelderaDataType getRandomNonNullType() {
-            return Randomly.fromList(
-                    Arrays.stream(values()).filter(t -> t != FelderaDataType.NULL).collect(Collectors.toList()));
+            return Randomly.fromList(Arrays.stream(values())
+                    .filter(t -> t != FelderaDataType.NULL && t != FelderaDataType.ANY).collect(Collectors.toList()));
+        }
+
+        public static FelderaDataType[] nonNullValues() {
+            return Arrays.stream(values()).filter(t -> t != FelderaDataType.NULL && t != FelderaDataType.ANY)
+                    .toArray(FelderaDataType[]::new);
         }
 
         public static FelderaDataType getRandomType() {
             return Randomly.fromOptions(values());
+        }
+    }
+
+    public static class FelderaCompositeDataType {
+        private final FelderaDataType dataType;
+        private final int size;
+        private final int scale;
+        private final FelderaCompositeDataType elementType;
+
+        public FelderaCompositeDataType(FelderaDataType dataType, int size, int scale) {
+            this.dataType = dataType;
+            this.size = size;
+            this.scale = scale;
+            this.elementType = null;
+        }
+
+        public static FelderaCompositeDataType arrayOf(FelderaDataType elementType) {
+            return new FelderaCompositeDataType(FelderaDataType.ARRAY, getRandomFromPrimitiveType(elementType));
+        }
+
+        public FelderaCompositeDataType(FelderaDataType dataType, FelderaCompositeDataType elementType) {
+            if (dataType != FelderaDataType.ARRAY) {
+                throw new IllegalArgumentException("dataType must be ARRAY");
+            }
+
+            this.dataType = dataType;
+            this.scale = -1;
+            this.size = -1;
+            this.elementType = elementType;
         }
 
         public FelderaExpression getRandomConstant(FelderaGlobalState globalState) {
@@ -129,29 +122,144 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
 
             return FelderaConstant.getRandomConstant(globalState, this);
         }
+
+        public boolean isNumeric() {
+            return this.getPrimitiveType().isNumeric();
+        }
+
+        public FelderaCompositeDataType getElementType() {
+            return this.elementType;
+        }
+
+        public static FelderaCompositeDataType getBooleanType() {
+            return FelderaCompositeDataType.getRandomFromPrimitiveType(FelderaDataType.BOOLEAN);
+        }
+
+        public static FelderaCompositeDataType getRandomVarcharType() {
+            return FelderaCompositeDataType.getRandomFromPrimitiveType(FelderaDataType.VARCHAR);
+        }
+
+        public static FelderaCompositeDataType getRandomNumericType() {
+            FelderaDataType type = FelderaDataType.getRandomNumericType();
+            return FelderaCompositeDataType.getRandomFromPrimitiveType(type);
+        }
+
+        public FelderaDataType getPrimitiveType() {
+            return dataType;
+        }
+
+        public int getSize() {
+            return size;
+        }
+
+        public int getScale() {
+            return scale;
+        }
+
+        public boolean isArray() {
+            return dataType == FelderaDataType.ARRAY;
+        }
+
+        public static FelderaCompositeDataType getRandomFromPrimitiveType(FelderaDataType type) {
+            int size = -1;
+            int scale = -1;
+            switch (type) {
+            case FLOAT:
+                size = Randomly.fromOptions(32, 64);
+                return new FelderaCompositeDataType(type, size, scale);
+            case INT:
+                size = Randomly.fromOptions(8, 16, 32, 64);
+                return new FelderaCompositeDataType(type, size, scale);
+            case ARRAY:
+                return new FelderaCompositeDataType(type, FelderaCompositeDataType.getRandomWithoutNull());
+            case DECIMAL:
+                scale = (int) Randomly.getNotCachedInteger(0, 10);
+                size = (int) Randomly.getNotCachedInteger(scale, 25);
+                return new FelderaCompositeDataType(type, size, scale);
+            case CHAR:
+                size = (int) Randomly.getNotCachedInteger(1, 10);
+                return new FelderaCompositeDataType(type, size, scale);
+            case VARCHAR:
+                if (Randomly.getBoolean()) {
+                    size = (int) Randomly.getNotCachedInteger(1, 30);
+                }
+                return new FelderaCompositeDataType(type, size, scale);
+            default:
+                return new FelderaCompositeDataType(type, size, scale);
+            }
+        }
+
+        public static FelderaCompositeDataType getRandomWithoutNull() {
+            FelderaDataType type = FelderaDataType.getRandomNonNullType();
+            return FelderaCompositeDataType.getRandomFromPrimitiveType(type);
+        }
+
+        @Override
+        public String toString() {
+            switch (dataType) {
+            case INT:
+                switch (size) {
+                case 8:
+                    return "TINYINT";
+                case 16:
+                    return "SMALLINT";
+                case 32:
+                    return "INT";
+                case 64:
+                    return "BIGINT";
+                default:
+                    throw new AssertionError(dataType.toString() + scale);
+                }
+            case FLOAT:
+                switch (size) {
+                case 32:
+                    return "REAL";
+                case 64:
+                    return "DOUBLE";
+                default:
+                    throw new AssertionError(dataType.toString() + scale);
+                }
+            case ARRAY:
+                if (elementType == null) {
+                    throw new AssertionError(this);
+                }
+                return elementType + " ARRAY";
+            case CHAR:
+                return "CHAR(" + size + ")";
+            case VARCHAR:
+                if (size == -1) {
+                    return "VARCHAR";
+                }
+                return "VARCHAR(" + size + ")";
+            case DECIMAL:
+                return "DECIMAL(" + size + ", " + scale + ")";
+            default:
+                return dataType.toString();
+            }
+        }
     }
 
     public static class FelderaFieldColumn extends FelderaColumn {
-        public FelderaFieldColumn(String name, FelderaDataType columnType) {
+        public FelderaFieldColumn(String name, FelderaCompositeDataType columnType) {
             super(name, columnType);
         }
 
-        public FelderaFieldColumn(String name, FelderaDataType columnType, boolean isNullable) {
+        public FelderaFieldColumn(String name, FelderaCompositeDataType columnType, boolean isNullable) {
             super(name, columnType, isNullable);
             // Note to self: later, assert that the Field column isn't something like INTERVAL
         }
     }
 
-    public static class FelderaColumn extends AbstractTableColumn<FelderaTable, FelderaDataType> {
+    public static class FelderaColumn extends AbstractTableColumn<FelderaTable, FelderaCompositeDataType> {
 
         private final boolean isNullable;
 
-        public FelderaColumn(String name, FelderaDataType columnType) {
+        public FelderaColumn(String name, FelderaCompositeDataType columnType) {
             super(name, null, columnType);
             this.isNullable = false;
         }
 
-        public FelderaColumn(String name, FelderaDataType columnType, boolean isNullable) {
+        public FelderaColumn(String name, FelderaCompositeDataType columnType, boolean isNullable) {
             super(name, null, columnType);
             this.isNullable = isNullable;
         }
@@ -161,7 +269,7 @@ public class FelderaSchema extends AbstractSchema<FelderaGlobalState, FelderaSch
         }
 
         public static FelderaColumn createDummy(String name) {
-            return new FelderaColumn(name, FelderaDataType.getRandomType());
+            return new FelderaColumn(name, FelderaCompositeDataType.getRandomWithoutNull());
         }
 
         public boolean isNullable() {

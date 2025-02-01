@@ -10,10 +10,13 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class HttpRequests {
     private final String baseUrl;
     private final ObjectMapper objectMapper;
+    private final Logger logger = Logger.getLogger(this.getClass().getName());
     private final HttpClient httpClient;
 
     public HttpRequests(String baseUrl) {
@@ -57,7 +60,9 @@ public class HttpRequests {
 
     private String sendRequest(HttpRequest request) throws Exception {
         try {
+            logger.log(Level.FINEST, "making request: " + request.toString());
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            logger.log(Level.FINEST, "got response: " + response.toString());
             validateResponse(response);
             return response.body();
         } catch (HttpTimeoutException e) {

@@ -11,8 +11,8 @@ import sqlancer.feldera.ast.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public final class FelderaExpressionGenerator
-        extends TypedExpressionGenerator<FelderaExpression, FelderaSchema.FelderaColumn, FelderaSchema.FelderaDataType>
+public final class FelderaExpressionGenerator extends
+        TypedExpressionGenerator<FelderaExpression, FelderaSchema.FelderaColumn, FelderaSchema.FelderaCompositeDataType>
         implements
         NoRECGenerator<FelderaSelect, FelderaJoin, FelderaExpression, FelderaSchema.FelderaTable, FelderaSchema.FelderaColumn> {
 
@@ -30,7 +30,7 @@ public final class FelderaExpressionGenerator
     }
 
     private FelderaExpression getBinaryComparison(int depth) {
-        FelderaSchema.FelderaDataType type = getRandomType();
+        FelderaSchema.FelderaCompositeDataType type = getRandomType();
         FelderaExpression left = generateExpression(type, depth + 1);
         FelderaExpression right = generateExpression(type, depth + 1);
         return new FelderaBinaryComparisonOperation(left, right,
@@ -43,7 +43,8 @@ public final class FelderaExpressionGenerator
 
         switch (exprType) {
         case NOT:
-            return new FelderaUnaryPrefixOperation(generateExpression(FelderaSchema.FelderaDataType.BOOLEAN, depth + 1),
+            return new FelderaUnaryPrefixOperation(
+                    generateExpression(FelderaSchema.FelderaCompositeDataType.getBooleanType(), depth + 1),
                     FelderaUnaryPrefixOperation.FelderaUnaryPrefixOperator.NOT);
         case COMPARISON:
             return getBinaryComparison(depth);
@@ -52,7 +53,10 @@ public final class FelderaExpressionGenerator
                     Randomly.fromOptions(FelderaUnaryPostfixOperation.FelderaUnaryPostfixOperator.IS_NULL,
                             FelderaUnaryPostfixOperation.FelderaUnaryPostfixOperator.IS_NOT_NULL));
         case BETWEEN:
-            FelderaSchema.FelderaDataType type = getRandomType();
+            FelderaSchema.FelderaCompositeDataType type = getRandomType();
+            if (type.isArray()) {
+                type = FelderaSchema.FelderaCompositeDataType.getBooleanType();
+            }
             expr = generateExpression(type, depth + 1);
             FelderaExpression left = generateExpression(type, depth + 1);
             FelderaExpression right = generateExpression(type, depth + 1);
@@ -64,14 +68,15 @@ public final class FelderaExpressionGenerator
     }
 
     private FelderaExpression generateStringExpression(int depth) {
-        FelderaSchema.FelderaDataType type = FelderaSchema.FelderaDataType.VARCHAR;
+        FelderaSchema.FelderaCompositeDataType type = FelderaSchema.FelderaCompositeDataType.getRandomVarcharType();
         List<FelderaFunction> applicableFunctions = FelderaFunction.getFunctionCompatibleWith(type);
         if (!applicableFunctions.isEmpty()) {
             FelderaFunction function = Randomly.fromList(applicableFunctions);
             return function.getCall(type, this, depth + 1);
         }
 
-        return generateLeafNode(FelderaSchema.FelderaDataType.VARCHAR);
+        return generateLeafNode(FelderaSchema.FelderaCompositeDataType
+                .getRandomFromPrimitiveType(FelderaSchema.FelderaDataType.VARCHAR));
     }
 
     private FelderaExpression generateIntegerString() {
@@ -82,27 +87,25 @@ public final class FelderaExpressionGenerator
         return new FelderaConstant.FelderaVarcharConstant(s);
     }
 
-    private FelderaExpression getBinaryArithmeticOperation(FelderaSchema.FelderaDataType type, int depth) {
-        if (Randomly.getBoolean()) {
-            type = FelderaSchema.FelderaDataType.getRandomNumericType();
-        }
+    private FelderaExpression getBinaryArithmeticOperation(FelderaSchema.FelderaCompositeDataType type, int depth) {
         return new FelderaBinaryArithmeticOperation(generateExpression(type, depth + 1),
                 generateExpression(type, depth + 1),
                 FelderaBinaryArithmeticOperation.FelderaBinaryArithmeticOperator.getRandom());
     }
 
     @Override
-    protected FelderaSchema.FelderaDataType getRandomType() {
-        return FelderaSchema.FelderaDataType.getRandomNonNullType();
+    protected FelderaSchema.FelderaCompositeDataType getRandomType() {
+        return FelderaSchema.FelderaCompositeDataType.getRandomWithoutNull();
     }
 
     @Override
-    protected boolean canGenerateColumnOfType(FelderaSchema.FelderaDataType type) {
+    protected boolean canGenerateColumnOfType(FelderaSchema.FelderaCompositeDataType type) {
         List<FelderaSchema.FelderaColumn> columns = filterColumns(type);
         return !columns.isEmpty();
     }
 
-    private FelderaExpression getAggregate(FelderaSchema.FelderaDataType type) throws IndexOutOfBoundsException {
+    private FelderaExpression getAggregate(FelderaSchema.FelderaCompositeDataType type)
+            throws IndexOutOfBoundsException {
         FelderaAggregate.FelderaAggregateFunction agg = Randomly
                 .fromList(FelderaAggregate.FelderaAggregateFunction.getAggregates(type));
         return generateArgsForAggregate(type, agg);
@@ -117,21 +120,34 @@ public final class FelderaExpressionGenerator
         }
     }
 
-    private FelderaAggregate generateArgsForAggregate(FelderaSchema.FelderaDataType type,
+    private FelderaAggregate generateArgsForAggregate(FelderaSchema.FelderaCompositeDataType type,
             FelderaAggregate.FelderaAggregateFunction agg) {
-        List<FelderaSchema.FelderaDataType> types = agg.getTypes(type);
+        List<FelderaSchema.FelderaCompositeDataType> types = agg.getTypes(type);
         List<FelderaExpression> args = new ArrayList<>();
         allowAggregates = false;
-        for (FelderaSchema.FelderaDataType argType : types) {
+        for (FelderaSchema.FelderaCompositeDataType argType : types) {
             args.add(generateExpression(argType));
         }
 
         return new FelderaAggregate(agg, args);
+    }
 
+    private FelderaExpression generateArrayExpression(FelderaSchema.FelderaCompositeDataType type, int depth) {
+        if (depth >= maxDepth) {
+            return generateLeafNode(type);
+        }
+
+        List<FelderaFunction> applicableFunctions = FelderaFunction.getFunctionCompatibleWith(type);
+        if (!applicableFunctions.isEmpty()) {
+            FelderaFunction function = Randomly.fromList(applicableFunctions);
+            return function.getCall(type, this, depth + 1);
+        }
+
+        return generateLeafNode(type);
     }
 
     @Override
-    public FelderaExpression generateExpression(FelderaSchema.FelderaDataType type, int depth) {
+    public FelderaExpression generateExpression(FelderaSchema.FelderaCompositeDataType type, int depth) {
         if (depth >= maxDepth) {
             return generateLeafNode(type);
         }
@@ -149,42 +165,41 @@ public final class FelderaExpressionGenerator
             }
         }
         if (type.isNumeric() && Randomly.getBooleanWithSmallProbability()) {
-            FelderaSchema.FelderaDataType randomType = FelderaSchema.FelderaDataType.getRandomType();
+            FelderaSchema.FelderaCompositeDataType randomType = FelderaSchema.FelderaCompositeDataType
+                    .getRandomWithoutNull();
             FelderaExpression expr;
-            if (randomType == FelderaSchema.FelderaDataType.VARCHAR) {
+            if (randomType.getPrimitiveType() == FelderaSchema.FelderaDataType.VARCHAR) {
                 expr = generateIntegerString();
             } else if (!randomType.isNumeric()) {
-                expr = generateExpression(FelderaSchema.FelderaDataType.getRandomNumericType(), depth + 1);
+                expr = generateExpression(FelderaSchema.FelderaCompositeDataType.getRandomNumericType(), depth + 1);
             } else {
                 expr = generateExpression(randomType, depth + 1);
             }
             return new FelderaCast(expr, type);
         }
 
-        switch (type) {
-        case BOOLEAN:
-            return generateBooleanExpression(depth);
-        case VARCHAR:
-            return generateStringExpression(depth);
-        case TINYINT:
-        case SMALLINT:
-        case INT:
-        case BIGINT:
-        case REAL:
-        case DOUBLE:
-            return getBinaryArithmeticOperation(type, depth);
+        switch (type.getPrimitiveType()) {
+        case ARRAY:
+            return generateArrayExpression(type, depth + 1);
         case DATE:
         case TIMESTAMP:
         case TIME:
         case CHAR:
-            FelderaExpression expr = FelderaConstant.getRandomConstant(globalState, type);
-            return new FelderaCast(expr, type);
+            return generateLeafNode(type);
+        case BOOLEAN:
+            return generateBooleanExpression(depth);
+        case VARCHAR:
+            return generateStringExpression(depth);
+        case INT:
+        case FLOAT:
+        case DECIMAL:
+            return getBinaryArithmeticOperation(type, depth);
         default:
             throw new AssertionError(type);
         }
     }
 
-    List<FelderaSchema.FelderaColumn> filterColumns(FelderaSchema.FelderaDataType type) {
+    List<FelderaSchema.FelderaColumn> filterColumns(FelderaSchema.FelderaCompositeDataType type) {
         if (columns == null) {
             return Collections.emptyList();
         } else {
@@ -193,7 +208,7 @@ public final class FelderaExpressionGenerator
     }
 
     @Override
-    protected FelderaExpression generateColumn(FelderaSchema.FelderaDataType type) {
+    protected FelderaExpression generateColumn(FelderaSchema.FelderaCompositeDataType type) {
         // HACK: if no col of such type exists, generate constant value instead
         List<FelderaSchema.FelderaColumn> colsOfType = filterColumns(type);
         if (colsOfType.isEmpty()) {
@@ -205,13 +220,13 @@ public final class FelderaExpressionGenerator
     }
 
     @Override
-    public FelderaExpression generateConstant(FelderaSchema.FelderaDataType type) {
+    public FelderaExpression generateConstant(FelderaSchema.FelderaCompositeDataType type) {
         return type.getRandomConstant(globalState);
     }
 
     @Override
     public FelderaExpression generatePredicate() {
-        return generateExpression(FelderaSchema.FelderaDataType.BOOLEAN, 0);
+        return generateExpression(FelderaSchema.FelderaCompositeDataType.getBooleanType(), 0);
     }
 
     @Override
@@ -235,7 +250,8 @@ public final class FelderaExpressionGenerator
 
     @Override
     public FelderaExpression generateBooleanExpression() {
-        return generateExpression(FelderaSchema.FelderaDataType.BOOLEAN);
+        return generateExpression(FelderaSchema.FelderaCompositeDataType
+                .getRandomFromPrimitiveType(FelderaSchema.FelderaDataType.BOOLEAN));
     }
 
     @Override
@@ -291,9 +307,9 @@ public final class FelderaExpressionGenerator
             // natural join is incompatible with other joins
             // because it needs unique column names
             // while other joins will produce duplicate column names
-            if (nrJoinClauses > 1) {
-                options.remove(FelderaJoin.FelderaJoinType.NATURAL);
-            }
+//            if (nrJoinClauses > 1) {
+//                options.remove(FelderaJoin.FelderaJoinType.NATURAL);
+//            }
             for (int i = 0; i < nrJoinClauses; i++) {
                 FelderaExpression joinClause = generatePredicate();
                 FelderaTableReference leftTable = Randomly.fromList(tablesRef);
@@ -302,10 +318,10 @@ public final class FelderaExpressionGenerator
                 tablesRef.remove(rightTable);
 
                 FelderaJoin.FelderaJoinType selectedOption = Randomly.fromList(options);
-                if (selectedOption == FelderaJoin.FelderaJoinType.NATURAL) {
-                    // NATURAL joins do not have an ON clause
-                    joinClause = null;
-                }
+//                if (selectedOption == FelderaJoin.FelderaJoinType.NATURAL) {
+//                    // NATURAL joins do not have an ON clause
+//                    joinClause = null;
+//                }
 
                 FelderaJoin j = new FelderaJoin(leftTable, rightTable, selectedOption, joinClause);
                 joinStatements.add(j);

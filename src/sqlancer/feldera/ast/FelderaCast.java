@@ -4,9 +4,9 @@ import sqlancer.feldera.FelderaSchema;
 
 public class FelderaCast implements FelderaExpression {
     private final FelderaExpression expr;
-    private final FelderaSchema.FelderaDataType type;
+    private final FelderaSchema.FelderaCompositeDataType type;
 
-    public FelderaCast(FelderaExpression expr, FelderaSchema.FelderaDataType type) {
+    public FelderaCast(FelderaExpression expr, FelderaSchema.FelderaCompositeDataType type) {
         this.expr = expr;
         this.type = type;
     }
